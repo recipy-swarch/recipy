@@ -15,8 +15,15 @@ services:
     env_file:
       - .env
     volumes:
-      - ./users-db/pgdata:/var/lib/postgresql/data
+      - ./db-postgres/pgdata:/var/lib/postgresql/data
       - ./db-postgres/initdb:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
-
+  mongo:
+    image: mongo:6
+    container_name: mongo_db
+    restart: always
+    volumes:
+      - ./db-mongo/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "27018:27017"    # mapea 27018 en el host al 27017 del contenedor

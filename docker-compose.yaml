@@ -7,6 +7,20 @@ services:
       - "3000:3000"
     volumes:
       - "./frontend/app/:/app/app/"
+  
+  fastapi:
+    build:
+      context: ./fastapi
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./fastapi/app:/app/app"
+    env_file:
+      - .env
+    depends_on:
+      - mongo
+    
   postgres:
     image: postgres:17.5-alpine3.21
     container_name: postgres_db

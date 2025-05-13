@@ -1,9 +1,8 @@
 services:
   frontend:
     build:
-      context: frontend
+      context: ./frontend
       dockerfile: Docker/development/Dockerfile
-    image: recipy-frontend
     ports:
       - "3000:3000"
     volumes:
@@ -15,15 +14,18 @@ services:
     env_file:
       - .env
     volumes:
-      - ./db-postgres/pgdata:/var/lib/postgresql/data
-      - ./db-postgres/initdb:/docker-entrypoint-initdb.d
+      - ./db-postgres/pgdata:/var/lib/postgresql/data # Persistencia de datos
+      - ./db-postgres/initdb:/docker-entrypoint-initdb.d # Comando de inicialización
     ports:
       - "5432:5432"
   mongo:
     image: mongo:6
     container_name: mongo_db
     restart: always
+    env_file:
+      - .env
     volumes:
-      - ./db-mongo/initdb:/docker-entrypoint-initdb.d:ro
+      - ./db-mongo/data:/data/db  # Persistencia de datos
+      - ./db-mongo/initdb:/docker-entrypoint-initdb.d:ro # Comando de inicialización
     ports:
       - "27018:27017"    # mapea 27018 en el host al 27017 del contenedor

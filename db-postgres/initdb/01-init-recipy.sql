@@ -3,6 +3,8 @@
 CREATE SCHEMA IF NOT EXISTS recipy;
 SET search_path = recipy;
 
+GRANT USAGE ON SCHEMA recipy TO postgres;
+
 -- 2. Tabla de usuarios
 CREATE TABLE "user" (
   id SERIAL PRIMARY KEY,

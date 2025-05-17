@@ -1,6 +1,11 @@
+// app/layout.tsx
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import "bootstrap/dist/css/bootstrap.min.css";
+import styles from "./page.module.css";
 import "./globals.css";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,13 +24,90 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
+      <head />
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
+        <nav id="navbar-example2" className="navbar bg-body-secondary px-2 mb-3">
+          <a className="navbar-brand" href="#">Navbar</a>
+          <ul className="nav nav-pills">
+            <li className="nav-item">
+              <a className="nav-link" href="#scrollspyHeading1">First</a>
+            </li>
+            <li className="nav-item">
+              <a className="nav-link" href="#scrollspyHeading2">Second</a>
+            </li>
+            <li className="nav-item dropdown">
+              <a className="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">Dropdown</a>
+              <ul className="dropdown-menu">
+                <li><a className="dropdown-item" href="#scrollspyHeading3">Third</a></li>
+                <li><a className="dropdown-item" href="#scrollspyHeading4">Fourth</a></li>
+                <li><hr className="dropdown-divider" /></li>
+                <li><a className="dropdown-item" href="#scrollspyHeading5">Fifth</a></li>
+              </ul>
+            </li>
+          </ul>
+        </nav>
+        <div className="row">
+          <div className="col-4">
+            <nav id="navbar-example3" className="h-100 flex-column align-items-stretch pe-4 border-end">
+              <nav className="nav nav-pills flex-column">
+                <a className="nav-link" href="#item-1">Item 1</a>
+                <nav className="nav nav-pills flex-column">
+                  <a className="nav-link ms-3 my-1" href="#item-1-1">Item 1-1</a>
+                  <a className="nav-link ms-3 my-1" href="#item-1-2">Item 1-2</a>
+                </nav>
+                <a className="nav-link" href="#item-2">Item 2</a>
+                <a className="nav-link" href="#item-3">Item 3</a>
+                <nav className="nav nav-pills flex-column">
+                  <a className="nav-link ms-3 my-1" href="#item-3-1">Item 3-1</a>
+                  <a className="nav-link ms-3 my-1" href="#item-3-2">Item 3-2</a>
+                </nav>
+              </nav>
+            </nav>
+          </div>
+
+          <div className="col-8">
+            <div data-bs-spy="scroll" data-bs-target="#navbar-example3" data-bs-smooth-scroll="true" className="scrollspy-example-2" tabindex="0">
+              <div id="item-1">
+                <h4>Item 1</h4>
+                <p>...</p>
+              </div>
+              <div id="item-1-1">
+                <h5>Item 1-1</h5>
+                <p>...</p>
+              </div>
+              <div id="item-1-2">
+                <h5>Item 1-2</h5>
+                <p>...</p>
+              </div>
+              <div id="item-2">
+                <h4>Item 2</h4>
+                <p>...</p>
+              </div>
+              <div id="item-3">
+                <h4>Item 3</h4>
+                <p>...</p>
+              </div>
+              <div id="item-3-1">
+                <h5>Item 3-1</h5>
+                <p>...</p>
+              </div>
+              <div id="item-3-2">
+                <h5>Item 3-2</h5>
+                <p>...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* {children} */}
+
+        <footer className={styles.footer}>
+          <h1>Hello footer</h1>
+        </footer>
       </body>
     </html>
   );

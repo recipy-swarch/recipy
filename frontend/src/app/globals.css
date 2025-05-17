@@ -1,14 +1,44 @@
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* main colors */
+  --background: #2E2127;
+  --nav-fot: #201A1D;
+  /* text colors */
+  --title: #DDBCE5;
+  --text: #FFFFFF;
+  /* container */
+  --main-container: #514D52;
+  /* comments */
+  --comment-stroke: #C489A1;
+  --comment-container: #2A232F;
+  --comment-title: #FFFFFF;
+  --comment-text: #C6C6C6;
+  /* buttons */
+  --main-button: #C489A1;
+  --main-button-text: #2E2127;
+
+  --main-button-text-hover: #FFFFFF;
+
+  --main-button-sel: #55293B;
+  --main-button-text: #FFFFFF;
+
+  --special-button: #C2823A;
+  --special-button-hover: #E39A47;
+
+  --negative-button: #A9393B;
+  --negative-button-color: #CC4346;
+  /* input color */
+  --input: #ffffff;
+  --input-text: #201A1D;
+  /* popup color */
+  --popup-container: #55293B;
 }
 
-@media (prefers-color-scheme: dark) {
+/* @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
-}
+} */
 
 html,
 body {

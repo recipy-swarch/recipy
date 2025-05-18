@@ -19,10 +19,10 @@
   --main-button-text-hover: #FFFFFF;
 
   --main-button-sel: #55293B;
-  --main-button-text: #FFFFFF;
+  --main-button-sel-text: #FFFFFF;
 
-  --special-button: #C2823A;
-  --special-button-hover: #E39A47;
+  --special-button: #ae7534;
+  --special-button-hover: #C2823A;
 
   --negative-button: #A9393B;
   --negative-button-color: #CC4346;
@@ -42,22 +42,32 @@
 
 html,
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
+  height: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 body {
   color: var(--foreground);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+main.container-fluid {
+  flex: 1;
+  /* take all available vertical space */
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+  /* outline: 1px solid red; */
 }
 
 a {
@@ -69,4 +79,57 @@ a {
   html {
     color-scheme: dark;
   }
+}
+
+.container-fluid {
+  padding: 0;
+}
+
+.btn {
+  background-color: var(--main-button);
+  color: var(--main-button-text);
+  border-color: none;
+  padding: 0;
+
+  a {
+    color: var(--main-button-text);
+  }
+}
+
+.btn:hover {
+  background-color: var(--main-button);
+  color: var(--main-button-text-hover);
+
+  a {
+    color: var(--main-button-text-hover);
+  }
+}
+
+.link-btn {
+  color: var(--main-button);
+}
+
+.link-btn:hover {
+  color: var(--main-button-text-hover);
+}
+
+.special-link-btn {
+  color: var(--special-button);
+}
+
+.special-link-btn:hover {
+  color: var(--special-button-hover);
+}
+
+.special-btn {
+  background-color: var(--special-button);
+  color: var(--text);
+
+  a {
+    color: var(--text);
+  }
+}
+
+.special-btn:hover {
+  background-color: var(--special-button-hover);
 }

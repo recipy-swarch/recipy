@@ -1,11 +1,11 @@
 import styles from "./page.module.css";
+import Link from "next/link";
+
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <h2>hola hola como fue como seria?</h2>
-      </main>
+    <div className="sidebar border-end">
+      hola este es el main
     </div>
   );
 }

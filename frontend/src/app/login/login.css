@@ -1,0 +1,36 @@
+.login-container {
+    background-color: var(--main-container);
+    border-radius: 12px;
+    padding: 2rem;
+}
+
+@media (max-width: 768px) {
+    .login-image-container {
+        position: relative;
+    }
+
+    .login-image {
+        position: absolute;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: brightness(0.6);
+    }
+
+    .form-section {
+        position: absolute;
+        left: 0;
+        z-index: 2;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .login-container {
+        padding: 2rem;
+        border-radius: 1rem;
+    }
+}

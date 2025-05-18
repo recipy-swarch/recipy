@@ -18,7 +18,7 @@ export default function LoginPage() {
                 <div className="d-flex  col-md-8 col-lg-8 col-xl-8 align-items-center justify-content-center h-100 form-section">
                     <form className="container col-10 col-md-8 col-xl-6 login-container">
                         <div className="form-outline mb-2">
-                            <label className="form-label" htmlFor="form3Example3">Email address</label>
+                            <label className="form-label" >Email address</label>
                             <input
                                 type="email"
                                 id="form3Example3"

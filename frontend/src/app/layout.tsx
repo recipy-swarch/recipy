@@ -68,7 +68,7 @@ export default function RootLayout({
         <main className="container-fluid">{children}</main>
 
         <div className="container-fluid footer">
-          <footer className="py-5">
+          <footer className="p-5">
             <div className="row g-0">
               {[1, 2, 3].map((_) => (
                 <div key={_} className="col-4 col-md-2 mb-3">

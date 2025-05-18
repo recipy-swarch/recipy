@@ -4,6 +4,16 @@
     padding: 2rem;
 }
 
+.form-control {
+    border-color: transparent;
+
+}
+
+.form-control:focus {
+    border-color: transparent;
+    box-shadow: none;
+}
+
 @media (max-width: 768px) {
     .login-image-container {
         position: relative;

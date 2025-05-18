@@ -27,7 +27,7 @@
   --negative-button: #A9393B;
   --negative-button-color: #CC4346;
   /* input color */
-  --input: #ffffff;
+  --input: #C9BCCE;
   --input-text: #201A1D;
   /* popup color */
   --popup-container: #55293B;
@@ -85,6 +85,11 @@ a {
   padding: 0;
 }
 
+.card {
+  background-color: var(--main-container);
+  border-color: none;
+}
+
 .btn {
   background-color: var(--main-button);
   color: var(--main-button-text);
@@ -132,4 +137,30 @@ a {
 
 .special-btn:hover {
   background-color: var(--special-button-hover);
+}
+
+.card-title {
+  color: var(--title);
+}
+
+.card-body {
+  color: var(--text);
+}
+
+.form-control {
+  background-color: var(--input);
+  border-color: transparent;
+  color: var(--input-text);
+
+}
+
+.form-control:focus {
+  background-color: var(--input);
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--input-text);
+}
+
+.react-datepicker-wrapper {
+  display: block !important;
 }

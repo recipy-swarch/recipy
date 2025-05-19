@@ -47,3 +47,15 @@ services:
       - ./recipe-db/initdb:/docker-entrypoint-initdb.d:ro # Comando de inicialización
     ports:
       - "27018:27017"    # mapea 27018 en el host al 27017 del contenedor
+
+  userauth-ms:
+    build:
+      context: ./userauth-ms
+      dockerfile: Dockerfile
+    container_name: userauth-ms
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    depends_on:
+      - userauth-db

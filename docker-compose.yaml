@@ -27,6 +27,8 @@ services:
     
   userauth-db:
     image: postgres:17.5-alpine3.21
+    networks:
+      - backend
     container_name: userauth-db
     restart: always
     env_file:
@@ -59,3 +61,24 @@ services:
       - .env
     depends_on:
       - userauth-db
+
+  userauth_postgrest:
+    image: postgrest/postgrest:v13.0.0
+    container_name: userauth_postgrest
+    networks:
+      - backend
+    restart: always
+    environment:
+      - PGRST_DB_URI=${PGRST_USERS_DB_URI}
+      - PGRST_DB_SCHEMA=${PGRST_USERS_DB_SCHEMA}
+      - PGRST_DB_ANON_ROLE=${PGRST_USERS_DB_ANON_ROLE}
+      - PGRST_SERVER_PORT=${PGRST_USERS_SERVER_PORT}
+    volumes:
+      - ./data/postgrest.conf:/etc/postgrest.conf
+    ports:
+      - "3001:3000"
+    depends_on:
+      - userauth-db
+
+networks:
+  backend:

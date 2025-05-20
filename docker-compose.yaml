@@ -6,7 +6,7 @@ services:
     ports:
       - "3000:3000"
       - "9229:9229" # Debugging
-      - "9230:9230" # Debugging
+      - "9230:9230" # Debuggingp
     volumes:
       - ./recipy-frontend/src:/app/src
     env_file:
@@ -77,6 +77,14 @@ services:
       - "3001:3000"
     depends_on:
       - userauth-db
+
+  api-gateway:
+    build: .
+    ports:
+      - "3030:3030"
+    depends_on:
+      - userauth-ms
+      - recipe-ms
 
 networks:
   backend:

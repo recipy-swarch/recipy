@@ -14,7 +14,7 @@ services:
     env_file:
       - .env
     networks:
-      - backend
+      - frontend
 
   # Recipe micro-service (FastAPI/Uvicorn)
   recipe-ms:
@@ -110,7 +110,9 @@ services:
       - recipe-ms
     networks:
       - backend
+      - frontend
 
 networks:
+  frontend:
   backend:
     driver: bridge

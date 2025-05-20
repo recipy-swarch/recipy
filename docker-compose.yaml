@@ -1,4 +1,3 @@
-
 services:
   # Frontend (Next.js)
   recipy-frontend:
@@ -67,12 +66,8 @@ services:
     image: postgrest/postgrest:v13.0.0
     container_name: userauth-postgrest
     restart: always
-    environment:
-      PGRST_DB_URI:       ${PGRST_USERS_DB_URI}
-      PGRST_DB_SCHEMA:    ${PGRST_USERS_DB_SCHEMA}
-      PGRST_DB_ANON_ROLE: ${PGRST_USERS_DB_ANON_ROLE}
-      PGRST_SERVER_PORT:  ${PGRST_USERS_SERVER_PORT}
-      JWT_SECRET:         ${JWT_SECRET}
+    env_file:
+       - .env
     volumes:
       - ./userauth-postgrest/postgrest.conf:/etc/postgrest.conf:ro
     ports:
@@ -86,11 +81,8 @@ services:
   userauth-ms:
     build:
       context: ./userauth-ms
-    environment:
-      - PGRST_URL=http://userauth-postgrest:3000
-      # - JWT_SECRET=${JWT_SECRET}
     env_file:
-      - ../.env     # Apunta al .env de la raíz
+      - .env     # Apunta al .env de la raíz
     depends_on:
       - userauth-postgrest
     networks:
@@ -100,9 +92,8 @@ services:
   api-gateway:
     build:
       context: ./recipy-ag
-    environment:
-      - USERAUTH_MS_URL=http://userauth-ms:5000
-      - RECIPE_MS_URL=http://recipe-ms:8000
+    env_file:
+      - .env
     ports:
       - "3030:3030"
     depends_on:
@@ -116,3 +107,4 @@ networks:
   frontend:
   backend:
     driver: bridge
+

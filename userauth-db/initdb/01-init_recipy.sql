@@ -4,7 +4,7 @@ CREATE SCHEMA IF NOT EXISTS recipy;
 SET search_path = recipy;
 
 -- 2. Tabla de usuarios
-CREATE TABLE "user" (
+CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   name            VARCHAR(100) NOT NULL,
   email           VARCHAR(200) UNIQUE NOT NULL,
@@ -19,18 +19,18 @@ CREATE TABLE "user" (
 );
 
 -- 3. Tabla de relaciones "siguiendo / seguido"
-CREATE TABLE relation (
+CREATE TABLE IF NOT EXISTS relation (
   id            SERIAL PRIMARY KEY,
   user_id       INT NOT NULL,     -- quien sigue
   following_id  INT NOT NULL,     -- a quién sigue
   follow_date   TIMESTAMP DEFAULT NOW(),
 
   CONSTRAINT fk_user
-    FOREIGN KEY(user_id) REFERENCES "user"(id)
+    FOREIGN KEY(user_id) REFERENCES users(id)
     ON DELETE CASCADE,
 
   CONSTRAINT fk_following
-    FOREIGN KEY(following_id) REFERENCES "user"(id)
+    FOREIGN KEY(following_id) REFERENCES users(id)
     ON DELETE CASCADE,
 
   CONSTRAINT unq_relation

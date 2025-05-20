@@ -8,16 +8,4 @@ export interface IRecipe {
     steps: string[];
 }
 
-export const GET_RECIPES_QUERY = `
-    query {
-        recipes {
-            id
-            title
-            prepTime
-            images
-            video
-            portions
-            steps
-        }
-    }
-`
+// Moví el QUERY al servicio, creo que es mejor tenerlo ahí y no en la interfaz

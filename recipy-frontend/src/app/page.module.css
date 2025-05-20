@@ -96,6 +96,7 @@ a.secondary {
   grid-row-start: 3;
   display: flex;
   gap: 24px;
+  background-color: var(--nav-fot);
 }
 
 .footer a {
@@ -166,3 +167,4 @@ a.secondary {
     filter: invert();
   }
 }
+

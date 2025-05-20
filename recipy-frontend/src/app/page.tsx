@@ -1,5 +1,8 @@
-import recipeService from '@/services/RecipeService'
 
+import recipeService from '@/services/RecipeService'
+import styles from "./page.module.css";
+import Link from "next/link";
+        
 export default async function RecipesPage() {
     const recipes = await recipeService.fetchRecipes()
 
@@ -22,3 +25,4 @@ export default async function RecipesPage() {
         </div>
     )
 }
+

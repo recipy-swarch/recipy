@@ -77,13 +77,22 @@ def get_profile():
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return jsonify({"error": "Missing token"}), 401
+
+    token = auth.split(" ", 1)[1]
     try:
-        payload = decode_jwt(auth.split(" ", 1)[1])
+        payload = decode_jwt(token)
     except jwt.ExpiredSignatureError:
         return jsonify({"error": "Token expired"}), 401
 
     user_id = payload["user_id"]
-    r = requests.get(f"{POSTGREST_URL}/user?id=eq.{user_id}")
+    # Llamada a PostgREST incluyendo el JWT en la cabecera
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    r = requests.get(
+        f"{POSTGREST_URL}/user?id=eq.{user_id}",
+        headers=headers
+    )
     if r.status_code != 200 or not r.json():
         return jsonify({"error": "User not found"}), 404
 
@@ -111,13 +120,17 @@ def update_profile():
     if not update:
         return jsonify({"error": "No valid fields to update"}), 400
 
-    # Patch a PostgREST
-    headers = {"Prefer": "return=representation"}
+    # Patch a PostgREST, enviando también el JWT para que PostgREST sepa quién es el usuario
+    headers = {
+        "Authorization": f"Bearer {auth.split(' ',1)[1]}",   # el token extraído antes
+        "Prefer": "return=representation"
+    }
     r = requests.patch(
         f"{POSTGREST_URL}/user?id=eq.{user_id}",
         json=update,
         headers=headers
     )
+
     if r.status_code not in (200, 204):
         return jsonify({"error": "Update failed", "detail": r.text}), r.status_code
 

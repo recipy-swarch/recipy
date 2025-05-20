@@ -6,7 +6,7 @@ services:
     ports:
       - "3000:3000"
       - "9229:9229" # Debugging
-      - "9230:9230" # Debugging
+      - "9230:9230" # Debuggingp
     volumes:
       - ./recipy-frontend/src:/app/src
     env_file:
@@ -60,6 +60,24 @@ services:
     depends_on:
       - userauth-db
 
+  userauth_postgrest:
+    image: postgrest/postgrest:v13.0.0
+    container_name: userauth_postgrest
+    networks:
+      - backend
+    restart: always
+    environment:
+      - PGRST_DB_URI=${PGRST_USERS_DB_URI}
+      - PGRST_DB_SCHEMA=${PGRST_USERS_DB_SCHEMA}
+      - PGRST_DB_ANON_ROLE=${PGRST_USERS_DB_ANON_ROLE}
+      - PGRST_SERVER_PORT=${PGRST_USERS_SERVER_PORT}
+    volumes:
+      - ./data/postgrest.conf:/etc/postgrest.conf
+    ports:
+      - "3001:3000"
+    depends_on:
+      - userauth-db
+
   api-gateway:
     build: .
     ports:
@@ -67,3 +85,6 @@ services:
     depends_on:
       - userauth-ms
       - recipe-ms
+
+networks:
+  backend:

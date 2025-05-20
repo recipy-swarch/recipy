@@ -1,21 +1,56 @@
--- 1. Rol para acceso web anonimo (solo lectura)
+-- 0. Activar pgcrypto
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- 1. Rol para acceso web anónimo (solo lectura)
 BEGIN;
-    create role web_anon nologin;
+    -- rol que PostgREST usará para peticiones “anon”
+    CREATE ROLE web_anon NOLOGIN;
 
-    grant usage on schema recipy to web_anon;
-    grant select on recipy.users to web_anon;
-
-    create role authenticator noinherit login password 'password_t';
-    grant web_anon to authenticator;
+    -- esquema y permisos básicos de solo lectura
+    GRANT USAGE ON SCHEMA recipy TO web_anon;
+    GRANT SELECT ON ALL TABLES IN SCHEMA recipy TO web_anon;
 COMMIT;
 
--- 2. Rol autenticado (inserción y actualización)
-BEGIN;
-  CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'password_t';
-  GRANT web_anon TO authenticator;
 
-  -- Permisos para crear usuarios (register) y editar perfil
-  GRANT INSERT ON recipy."user" TO authenticator;
-  GRANT UPDATE ON recipy."user" TO authenticator;
+-- 2. Rol autenticado (login)
+BEGIN;
+    CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'password_t';
+    -- hereda permisos de solo lectura
+    GRANT web_anon TO authenticator;
 COMMIT;
+
+
+-- 3. Función RPC para registro de usuarios
+--    Se ejecuta como dueño de la función (SECURITY DEFINER)
+CREATE OR REPLACE FUNCTION recipy.register_user(
+    _name     TEXT,
+    _email    TEXT,
+    _username TEXT,
+    _password TEXT
+) RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    INSERT INTO recipy.users(
+        name,
+        email,
+        username,
+        password_hash
+    ) VALUES (
+        _name,
+        _email,
+        _username,
+        crypt(_password, gen_salt('bf'))
+    );
+END;
+$$;
+
+-- 4. Conceder permiso de ejecución de la función
+GRANT EXECUTE ON FUNCTION recipy.register_user(
+    TEXT, TEXT, TEXT, TEXT
+) TO web_anon;
+GRANT EXECUTE ON FUNCTION recipy.register_user(
+    TEXT, TEXT, TEXT, TEXT
+) TO authenticator;
+

@@ -83,6 +83,8 @@ services:
       context: ./userauth-ms
     env_file:
       - .env     # Apunta al .env de la raíz
+    ports:
+      - "5000:5000"   
     depends_on:
       - userauth-postgrest
     networks:

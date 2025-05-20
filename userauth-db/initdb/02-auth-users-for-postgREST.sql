@@ -1,32 +1,47 @@
--- 0. Activar pgcrypto
+/*
+-- ALTER TABLE recipy.users ENABLE ROW LEVEL SECURITY;  -- para futuros prototipos
+
+
+-- 0.2. Política: cada usuario sólo puede actualizar su propia fila (RLS futuro)
+CREATE POLICY users_update_own
+  ON recipy.users
+  FOR UPDATE
+  TO web_anon
+  USING ( id = current_setting('request.jwt.claims.sub')::int );
+
+-- Grant que permitiría aplicar la política
+GRANT UPDATE ON recipy.users TO web_anon;
+*/
+
+-- 0. Activa la extensión de cifrado
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- 1. Rol para acceso web anónimo (solo lectura)
+-- 1. Crea el rol web_anon y dale permisos de lectura + update
 BEGIN;
-    -- rol que PostgREST usará para peticiones “anon”
-    CREATE ROLE web_anon NOLOGIN;
+  -- rol que usará PostgREST para peticiones sin token
+  CREATE ROLE web_anon NOLOGIN;
 
-    -- esquema y permisos básicos de solo lectura
-    GRANT USAGE ON SCHEMA recipy TO web_anon;
-    GRANT SELECT ON ALL TABLES IN SCHEMA recipy TO web_anon;
+  -- permisos en el esquema
+  GRANT USAGE ON SCHEMA recipy TO web_anon;
+
+  -- permisos en tablas
+  GRANT SELECT ON ALL TABLES IN SCHEMA recipy TO web_anon;
+  GRANT UPDATE ON recipy.users TO web_anon;
 COMMIT;
 
-
--- 2. Rol autenticado (login)
+-- 2. Crear el rol authenticator y hereda web_anon
 BEGIN;
-    CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'password_t';
-    -- hereda permisos de solo lectura
-    GRANT web_anon TO authenticator;
+  CREATE ROLE authenticator LOGIN PASSWORD 'password_t';
+  GRANT web_anon TO authenticator;
 COMMIT;
-
 
 -- 3. Función RPC para registro de usuarios
 --    Se ejecuta como dueño de la función (SECURITY DEFINER)
 CREATE OR REPLACE FUNCTION recipy.register_user(
-    _name     TEXT,
     _email    TEXT,
-    _username TEXT,
-    _password TEXT
+    _name     TEXT,
+    _password TEXT,
+    _username TEXT
 ) RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -47,10 +62,7 @@ END;
 $$;
 
 -- 4. Conceder permiso de ejecución de la función
-GRANT EXECUTE ON FUNCTION recipy.register_user(
-    TEXT, TEXT, TEXT, TEXT
-) TO web_anon;
-GRANT EXECUTE ON FUNCTION recipy.register_user(
-    TEXT, TEXT, TEXT, TEXT
-) TO authenticator;
+GRANT EXECUTE
+  ON FUNCTION recipy.register_user(TEXT, TEXT, TEXT, TEXT)
+  TO web_anon, authenticator;
 

@@ -18,9 +18,16 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_token(sub: int) -> str:
     payload = {
         "sub": sub,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXP_HRS)
+        "role": "authenticator", # <-- rol de autenticados que definimos en PostgREST
+        "aud":  "postgrest",  # <<< coincide con jwt-aud en postgrest.conf
+        "exp":  datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXP_HRS)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
 def decode_token(token: str) -> dict:
-    return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+    return jwt.decode(
+        token,
+        JWT_SECRET,
+        algorithms=[JWT_ALGO],
+        audience="postgrest"              # <<< debe coincidir con jwt-aud
+    )

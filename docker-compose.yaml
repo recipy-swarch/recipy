@@ -1,45 +1,61 @@
 services:
-  frontend:
+  recipy-frontend:
     build:
-      context: ./frontend
+      context: ./recipy-frontend
       dockerfile: Docker/development/Dockerfile
     ports:
       - "3000:3000"
+      - "9229:9229" # Debugging
+      - "9230:9230" # Debugging
     volumes:
-      - ./frontend/src:/app/src
+      - ./recipy-frontend/src:/app/src
+    env_file:
+      - .env
   
-  fastapi:
+  recipe-ms:
     build:
-      context: ./fastapi
+      context: ./recipe-ms
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
     volumes:
-      - "./fastapi/app:/app/app"
+      - ./recipe-ms/app:/app/app
     env_file:
       - .env
     depends_on:
-      - mongo
+      - recipe-db
     
-  postgres:
+  userauth-db:
     image: postgres:17.5-alpine3.21
-    container_name: postgres_db
+    container_name: userauth-db
     restart: always
     env_file:
       - .env
     volumes:
-      - ./db-postgres/pgdata:/var/lib/postgresql/data # Persistencia de datos
-      - ./db-postgres/initdb:/docker-entrypoint-initdb.d # Comando de inicialización
+      - ./userauth-db/data:/var/lib/postgresql/data # Persistencia de datos
+      - ./userauth-db/initdb:/docker-entrypoint-initdb.d # Comando de inicialización
     ports:
       - "5432:5432"
-  mongo:
+  recipe-db:
     image: mongo:6
-    container_name: mongo_db
+    container_name: recipe-db
     restart: always
     env_file:
       - .env
     volumes:
-      - ./db-mongo/data:/data/db  # Persistencia de datos
-      - ./db-mongo/initdb:/docker-entrypoint-initdb.d:ro # Comando de inicialización
+      - ./recipe-db/data:/data/db  # Persistencia de datos
+      - ./recipe-db/initdb:/docker-entrypoint-initdb.d:ro # Comando de inicialización
     ports:
       - "27018:27017"    # mapea 27018 en el host al 27017 del contenedor
+
+  userauth-ms:
+    build:
+      context: ./userauth-ms
+      dockerfile: Dockerfile
+    container_name: userauth-ms
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    depends_on:
+      - userauth-db

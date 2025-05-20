@@ -1,17 +1,22 @@
+
 services:
+  # Frontend (Next.js)
   recipy-frontend:
     build:
       context: ./recipy-frontend
       dockerfile: Docker/development/Dockerfile
     ports:
       - "3000:3000"
-      - "9229:9229" # Debugging
-      - "9230:9230" # Debuggingp
+      - "9229:9229" # Debugger
+      - "9230:9230" # Debugger
     volumes:
       - ./recipy-frontend/src:/app/src
     env_file:
       - .env
-  
+    networks:
+      - backend
+
+  # Recipe micro-service (FastAPI/Uvicorn)
   recipe-ms:
     build:
       context: ./recipe-ms
@@ -24,18 +29,10 @@ services:
       - .env
     depends_on:
       - recipe-db
-    
-  userauth-db:
-    image: postgres:17.5-alpine3.21
-    container_name: userauth-db
-    restart: always
-    env_file:
-      - .env
-    volumes:
-      - ./userauth-db/data:/var/lib/postgresql/data # Persistencia de datos
-      - ./userauth-db/initdb:/docker-entrypoint-initdb.d # Comando de inicialización
-    ports:
-      - "5432:5432"
+    networks:
+      - backend
+
+  # MongoDB for recipes
   recipe-db:
     image: mongo:6
     container_name: recipe-db
@@ -43,50 +40,77 @@ services:
     env_file:
       - .env
     volumes:
-      - ./recipe-db/data:/data/db  # Persistencia de datos
-      - ./recipe-db/initdb:/docker-entrypoint-initdb.d:ro # Comando de inicialización
+      - ./recipe-db/data:/data/db
+      - ./recipe-db/initdb:/docker-entrypoint-initdb.d:ro
     ports:
-      - "27018:27017"    # mapea 27018 en el host al 27017 del contenedor
-
-  userauth-ms:
-    build:
-      context: ./userauth-ms
-      dockerfile: Dockerfile
-    container_name: userauth-ms
-    ports:
-      - "5000:5000"
-    env_file:
-      - .env
-    depends_on:
-      - userauth-db
-
-  userauth_postgrest:
-    image: postgrest/postgrest:v13.0.0
-    container_name: userauth_postgrest
+      - "27018:27017"
     networks:
       - backend
+
+  # PostgreSQL for user-auth
+  userauth-db:
+    image: postgres:17.5-alpine3.21
+    container_name: userauth-db
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./userauth-db/data:/var/lib/postgresql/data
+      - ./userauth-db/initdb:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - backend
+
+  # PostgREST for user-auth
+  userauth-postgrest:
+    image: postgrest/postgrest:v13.0.0
+    container_name: userauth-postgrest
     restart: always
     environment:
-      - PGRST_DB_URI=${PGRST_USERS_DB_URI}
-      - PGRST_DB_SCHEMA=${PGRST_USERS_DB_SCHEMA}
-      - PGRST_DB_ANON_ROLE=${PGRST_USERS_DB_ANON_ROLE}
-      - PGRST_SERVER_PORT=${PGRST_USERS_SERVER_PORT}
+      PGRST_DB_URI:       ${PGRST_USERS_DB_URI}
+      PGRST_DB_SCHEMA:    ${PGRST_USERS_DB_SCHEMA}
+      PGRST_DB_ANON_ROLE: ${PGRST_USERS_DB_ANON_ROLE}
+      PGRST_SERVER_PORT:  ${PGRST_USERS_SERVER_PORT}
+      JWT_SECRET:         ${JWT_SECRET}
     volumes:
-      - ./data/postgrest.conf:/etc/postgrest.conf
+      - ./userauth-postgrest/postgrest.conf:/etc/postgrest.conf:ro
     ports:
       - "3001:3000"
     depends_on:
       - userauth-db
+    networks:
+      - backend
 
+  # Custom Flask + PostgREST orchestrator
+  userauth-ms:
+    build:
+      context: ./userauth-ms
+    environment:
+      - PGRST_URL=http://userauth-postgrest:3000
+      # - JWT_SECRET=${JWT_SECRET}
+    env_file:
+      - ../.env     # Apunta al .env de la raíz
+    depends_on:
+      - userauth-postgrest
+    networks:
+      - backend
+
+  # API Gateway (Nest + Express + HTTP-Proxy-Middleware)
   api-gateway:
     build:
       context: ./recipy-ag
-      dockerfile: Dockerfile
+    environment:
+      - USERAUTH_MS_URL=http://userauth-ms:5000
+      - RECIPE_MS_URL=http://recipe-ms:8000
     ports:
       - "3030:3030"
     depends_on:
       - userauth-ms
       - recipe-ms
+    networks:
+      - backend
 
 networks:
   backend:
+    driver: bridge

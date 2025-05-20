@@ -5,27 +5,38 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Proxy /user/* al servicio de usuarios
+  // Proxy /user/* al servicio de usuarios (se quita el prefijo /user)
   app.use(
     '/user',
     createProxyMiddleware({
-      target: 'http://127.0.0.1:5000',
+      target: process.env.USERAUTH_MS_URL || 'http://userauth-ms:5000',
       changeOrigin: true,
-      pathRewrite: { '^/user': '/user' },
+      pathRewrite: { '^/user': '' },
     }),
   );
 
-  // Proxy /recipe/* al servicio de recetas
+  // Proxy /recipe/* al servicio de recetas (se quita el prefijo /recipe)
   app.use(
     '/recipe',
     createProxyMiddleware({
-      target: 'http://127.0.0.1:8000',
+      target: process.env.RECIPE_MS_URL || 'http://recipe-ms:8000',
       changeOrigin: true,
-      pathRewrite: { '^/recipe': '/recipe' },
+      pathRewrite: { '^/recipe': '' },
     }),
   );
+
+  // Proxy /rpc/* al PostgREST
+app.use(
+  '/rpc',
+  createProxyMiddleware({
+    target: process.env.POSTGREST_URL || 'http://userauth-postgrest:3000',
+    changeOrigin: true,
+    // No pathRewrite: dejamos /rpc/intacto
+  }),
+);
 
   await app.listen(3030);
   console.log('API Gateway escuchando en http://0.0.0.0:3030');
 }
+
 bootstrap();

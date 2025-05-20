@@ -1,4 +1,4 @@
-import { IRecipe, GET_RECIPES_QUERY } from '@/interfaces/IRecipe'
+import { IRecipe } from '@/interfaces/IRecipe'
 
 class RecipeService {
     private apiUrl : string
@@ -13,12 +13,25 @@ class RecipeService {
     fetchRecipes = async (): Promise<IRecipe[]> => {
         try {
             const response = await fetch(`${this.apiUrl}/graphql`, {
-                cache: 'force-cache',
+                next: { revalidate:5 }, // Cache just after 5 seconds
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ query: GET_RECIPES_QUERY }),
+                body: JSON.stringify({ query: `
+                    query {
+                        recipes {
+                            id
+                            title
+                            prepTime
+                            images
+                            video
+                            portions
+                            steps
+                        }
+                    }
+                `
+                }),
             })
 
             const result = await response.json()

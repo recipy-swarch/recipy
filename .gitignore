@@ -402,10 +402,3 @@ FodyWeavers.xsd
 
 # Nuevos
 .env
-
-# Data de las bases
-db-mongo/data/*
-db-mongo/data/*/**
-
-db-postgres/data/*
-db-postgres/data/*/**

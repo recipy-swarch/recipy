@@ -6,7 +6,14 @@ RUN npm ci
 
 RUN npx next telemetry disable
 
+
+# Rergular dev server
 EXPOSE 3000
+# Debugging
+EXPOSE 9229
+EXPOSE 9230
+
+
 ENV PORT=3000
 
 COPY . .

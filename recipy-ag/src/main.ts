@@ -9,7 +9,7 @@ async function bootstrap() {
   app.use(
     '/user',
     createProxyMiddleware({
-      target: process.env.USERAUTH_MS_URL || 'http://userauth-ms:5000',
+      target: process.env.USERAUTH_MS_URL,
       changeOrigin: true,
       pathRewrite: { '^/user': '' },
     }),
@@ -19,21 +19,38 @@ async function bootstrap() {
   app.use(
     '/recipe',
     createProxyMiddleware({
-      target: process.env.RECIPE_MS_URL || 'http://recipe-ms:8000',
+      target: process.env.RECIPE_MS_URL,
       changeOrigin: true,
       pathRewrite: { '^/recipe': '' },
     }),
   );
 
   // Proxy /rpc/* al PostgREST
-app.use(
-  '/rpc',
-  createProxyMiddleware({
-    target: process.env.POSTGREST_URL || 'http://userauth-postgrest:3000',
-    changeOrigin: true,
-    // No pathRewrite: dejamos /rpc/intacto
-  }),
-);
+  app.use(
+    '/rpc',
+    createProxyMiddleware({
+      target: process.env.POSTGREST_URL,
+      changeOrigin: true,
+      // No pathRewrite: dejamos /rpc/intacto
+      /*
+      pathRewrite: {
+        '^/rcp': '',
+      },
+      */
+    }),
+  );
+
+  // Proxy /auth/* al servicio de autenticación (Flask) 
+  app.use(
+    '/auth',
+    createProxyMiddleware({
+      target: process.env.USERAUTH_MS_URL,
+      changeOrigin: true,
+      pathRewrite: {
+        '^/auth': '', // quita el prefijo /auth a la URL que llega al microservicio 
+      },
+    }),
+  );
 
   await app.listen(3030);
   console.log('API Gateway escuchando en http://0.0.0.0:3030');

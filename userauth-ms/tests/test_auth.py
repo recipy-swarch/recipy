@@ -3,8 +3,8 @@ import pytest
 from app import app as flask_app
 from dotenv import load_dotenv
 
-@pytest.fixture(autouse=True)
-def load_env_and_client(tmp_path, monkeypatch):
+@pytest.fixture
+def client(tmp_path, monkeypatch):
     # Carga variables de entorno del .env
     load_dotenv(dotenv_path=os.path.join(os.getcwd(), ".env"))
     flask_app.config["TESTING"] = True

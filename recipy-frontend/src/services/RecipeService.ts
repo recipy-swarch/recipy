@@ -12,7 +12,8 @@ class RecipeService {
 
     fetchRecipes = async (): Promise<IRecipe[]> => {
         try {
-            const response = await fetch(`${this.apiUrl}/graphql`, {
+            console.log("ehis is the urlk",this.apiUrl)
+            const response = await fetch(`${this.apiUrl}/recipe/graphql`, {
                 next: { revalidate:5 }, // Cache just after 5 seconds
                 method: 'POST',
                 headers: {

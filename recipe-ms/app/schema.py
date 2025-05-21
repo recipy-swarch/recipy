@@ -114,6 +114,7 @@ class Mutation:
         coll = get_collection("recipes")
         # Insertar
         res = await coll.insert_one(recipe.__dict__)
+        print("Insertado:", res.inserted_id)
         # Leer de vuelta el documento
         doc = await coll.find_one({"_id": res.inserted_id})
         # Mapear _id → id y limpiar

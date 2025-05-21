@@ -107,6 +107,17 @@ services:
     networks:
       - backend
       - frontend
+  
+  # Imgur API endpoint
+  imgur-api:
+    build:
+      context: ./imgur-api
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    networks:
+      - backend
 
 networks:
   frontend:

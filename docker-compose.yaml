@@ -94,7 +94,7 @@ services:
       - backend
 
   # API Gateway (Nest + Express + HTTP-Proxy-Middleware)
-  api-gateway:
+  recipy-ag:
     build:
       context: ./recipy-ag
     env_file:

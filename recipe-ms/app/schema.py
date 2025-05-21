@@ -1,9 +1,16 @@
 import strawberry
 from typing import List, Optional
+from datetime import datetime
+from bson import ObjectId
+from app.db import get_collection
+
+# -------------------------
+# Tipos de dominio
+# -------------------------
 
 @strawberry.type
 class Recipe:
-    id: int
+    id: str
     title: str
     prep_time: str
     images: Optional[List[str]] = None
@@ -16,47 +23,155 @@ class RecipeInput:
     title: str
     prep_time: str
     images: Optional[List[str]] = None
-    video: Optional[str] = None
+    video: Optional[List[str]] = None
     portions: int
     steps: List[str]
 
 @strawberry.type
-class Mutation:
-    @strawberry.mutation
-    def add_recipe(self, recipe: RecipeInput) -> Recipe:
-        from app.data import recipes
-        new_id = max((r.id for r in recipes), default=0) + 1
-        new_recipe = Recipe(id=new_id, **recipe.__dict__)
-        recipes.append(new_recipe)
-        return new_recipe
+class Comment:
+    id: str
+    recipe_id: str
+    user_id: str
+    content: str
+    parent_id: Optional[str]
+    created_at: str
 
-    @strawberry.mutation
-    def update_recipe(self, id: int, recipe: RecipeInput) -> Optional[Recipe]:
-        from app.data import recipes
-        for i, r in enumerate(recipes):
-            if r.id == id:
-                updated = Recipe(id=id, **recipe.__dict__)
-                recipes[i] = updated
-                return updated
-        return None
+@strawberry.type
+class Like:
+    id: str
+    recipe_id: str
+    user_id: str
+    created_at: str
 
-    @strawberry.mutation
-    def delete_recipe(self, id: int) -> bool:
-        from app.data import recipes
-        for i, r in enumerate(recipes):
-            if r.id == id:
-                recipes.pop(i)
-                return True
-        return False
+# -------------------------
+# Resolutores de consulta
+# -------------------------
 
 @strawberry.type
 class Query:
+
     @strawberry.field
-    def recipes(self) -> List[Recipe]:
-        from app.data import recipes
+    async def recipes(self) -> List[Recipe]:
+        coll = get_collection("recipes")
+        raw_docs = await coll.find({}).to_list(100)
+        recipes: List[Recipe] = []
+        for doc in raw_docs:
+            # Mapear _id -> id y eliminar el campo interno
+            doc["id"] = str(doc.pop("_id"))
+            recipes.append(Recipe(**doc))
         return recipes
 
     @strawberry.field
-    def recipe(self, id: int) -> Optional[Recipe]:
-        from app.data import recipes
-        return next((r for r in recipes if r.id == id), None)
+    async def recipe(self, id: str) -> Optional[Recipe]:
+        coll = get_collection("recipes")
+        # Buscar por ObjectId
+        doc = await coll.find_one({"_id": ObjectId(id)})
+        if not doc:
+            return None
+        doc["id"] = str(doc.pop("_id"))
+        return Recipe(**doc)
+
+    @strawberry.field
+    async def comments(self, recipe_id: str) -> List[Comment]:
+        coll = get_collection("comments")
+        raw = await coll.find({"recipe_id": recipe_id, "parent_id": None}).to_list(100)
+        comments: List[Comment] = []
+        for doc in raw:
+            doc["id"] = str(doc.pop("_id"))
+            comments.append(Comment(**doc))
+        return comments
+
+    @strawberry.field
+    async def replies(self, comment_id: str) -> List[Comment]:
+        coll = get_collection("comments")
+        raw = await coll.find({"parent_id": comment_id}).to_list(50)
+        replies: List[Comment] = []
+        for doc in raw:
+            doc["id"] = str(doc.pop("_id"))
+            replies.append(Comment(**doc))
+        return replies
+
+    # (Opcional) Query para listar “me gusta” de una receta
+    @strawberry.field
+    async def likes(self, recipe_id: str) -> List[Like]:
+        coll = get_collection("likes")
+        raw = await coll.find({"recipe_id": recipe_id}).to_list(100)
+        likes: List[Like] = []
+        for doc in raw:
+            doc["id"] = str(doc.pop("_id"))
+            likes.append(Like(**doc))
+        return likes
+
+# -------------------------
+# Resolutores de mutación
+# -------------------------
+
+@strawberry.type
+class Mutation:
+
+    @strawberry.mutation
+    async def add_recipe(self, recipe: RecipeInput) -> Recipe:
+        coll = get_collection("recipes")
+        # Insertar
+        res = await coll.insert_one(recipe.__dict__)
+        # Leer de vuelta el documento
+        doc = await coll.find_one({"_id": res.inserted_id})
+        # Mapear _id → id y limpiar
+        doc["id"] = str(doc.pop("_id"))
+        return Recipe(**doc)
+
+    @strawberry.mutation
+    async def update_recipe(self, id: str, recipe: RecipeInput) -> Optional[Recipe]:
+        coll = get_collection("recipes")
+        await coll.update_one({"_id": ObjectId(id)}, {"$set": recipe.__dict__})
+        doc = await coll.find_one({"_id": ObjectId(id)})
+        if not doc:
+            return None
+        doc["id"] = str(doc.pop("_id"))
+        return Recipe(**doc)
+
+    @strawberry.mutation
+    async def delete_recipe(self, id: str) -> bool:
+        coll = get_collection("recipes")
+        res = await coll.delete_one({"_id": ObjectId(id)})
+        return res.deleted_count == 1
+
+    @strawberry.mutation
+    async def add_comment(
+        self,
+        recipe_id: str,
+        user_id: str,
+        content: str,
+        parent_id: Optional[str] = None
+    ) -> Comment:
+        coll = get_collection("comments")
+        # Insertar
+        res = await coll.insert_one({
+            "recipe_id": recipe_id,
+            "user_id": user_id,
+            "content": content,
+            "parent_id": parent_id,
+            "created_at": datetime.utcnow().isoformat()
+        })
+        # Leer de vuelta
+        doc = await coll.find_one({"_id": res.inserted_id})
+        # Mapear _id → id y limpiar
+        doc["id"] = str(doc.pop("_id"))
+        return Comment(**doc)
+
+
+
+    @strawberry.mutation
+    async def like_recipe(self, recipe_id: str, user_id: str) -> Like:
+        coll = get_collection("likes")
+        # Insertar el like
+        res = await coll.insert_one({
+            "recipe_id": recipe_id,
+            "user_id": user_id,
+            "created_at": datetime.utcnow().isoformat()
+        })
+        # Leer de vuelta el documento completo
+        doc = await coll.find_one({"_id": res.inserted_id})
+        # Mapear _id → id y eliminar el campo interno
+        doc["id"] = str(doc.pop("_id"))
+        return Like(**doc)

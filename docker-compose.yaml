@@ -70,6 +70,9 @@ services:
        - .env
     volumes:
       - ./userauth-postgrest/postgrest.conf:/etc/postgrest.conf:ro
+      - ./recipe-db/data:/data/db  # Persistencia de datos
+      - ./recipe-db/initdb:/docker-entrypoint-initdb.d:ro # Comando de inicialización
+    
     ports:
       - "3001:3000"
     depends_on:

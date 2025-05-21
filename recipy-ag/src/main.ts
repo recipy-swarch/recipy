@@ -32,9 +32,11 @@ async function bootstrap() {
       target: process.env.POSTGREST_URL,
       changeOrigin: true,
       // No pathRewrite: dejamos /rpc/intacto
+      /*
       pathRewrite: {
-        '^/rcp': '', // quita el prefijo /auth a la URL que llega al microservicio 
+        '^/rcp': '',
       },
+      */
     }),
   );
 

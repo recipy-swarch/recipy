@@ -31,3 +31,21 @@ def decode_token(token: str) -> dict:
         algorithms=[JWT_ALGO],
         audience="postgrest"              # <<< debe coincidir con jwt-aud
     )
+
+def test_register_duplicate(client):
+    # Registro inicial
+    client.post("/register", json={
+        "name": "Dup",
+        "email": "dup@example.com",
+        "username": "dupuser",
+        "password": "pass"
+    })
+    # Intento duplicado
+    resp = client.post("/register", json={
+        "name": "Dup",
+        "email": "dup@example.com",
+        "username": "dupuser",
+        "password": "pass"
+    })
+    assert resp.status_code == 409
+    assert "already" in resp.json.get("error","").lower()

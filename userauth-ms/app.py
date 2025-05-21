@@ -1,56 +1,76 @@
+# userauth-ms/app.py
+
 import os
 import datetime
 import requests
 import jwt
-from flask import Flask, request, jsonify
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, request, jsonify, abort
+from flask_cors import CORS
+from auth import hash_password, verify_password, create_token, decode_token
 from dotenv import load_dotenv
 
 # Carga variables de entorno de ../.env
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 
 # URL de PostgREST (userauth-postgrest)
-POSTGREST_URL = os.getenv("POSTGREST_URL")  # ej: http://userauth-db:3000
-# Secreto para firmar JWT
+PGRST = os.getenv("PGRST_URL", "").rstrip("/")  # ej: http://userauth-postgrest:3000
+HEADERS = {"Content-Type": "application/json"}
+
+# JWT settings
 JWT_SECRET = os.getenv("JWT_SECRET", "change-me")
 JWT_ALGORITHM = "HS256"
 JWT_EXP_HOURS = int(os.getenv("JWT_EXP_HOURS", "24"))
 
 
-def create_jwt(user_id: int):
-    payload = {
-        "user_id": user_id,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXP_HOURS)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-
-def decode_jwt(token: str):
-    return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+def pg(path, **kw):
+    """
+    Helper para llamar a PostgREST.
+    Uso:
+      pg("users", method="POST", headers=..., json=...)
+      pg(f"users?username=eq.{u}", headers=...)
+    """
+    return requests.request(
+        method=kw.pop("method", "GET"),
+        url=f"{PGRST}/{path}",
+        **kw
+    )
 
 
 @app.route("/register", methods=["POST"])
 def register():
     data = request.json or {}
-    for f in ("name", "email", "username", "password"):
-        if not data.get(f):
-            return jsonify({"error": f"Missing field {f}"}), 400
 
-    # Hashea la contraseña
-    password_hash = generate_password_hash(data["password"])
+    # Validación básica de campos
+    for field in ("name", "email", "username", "password"):
+        if not data.get(field):
+            return jsonify({"error": f"Falta campo {field}"}), 400
+
+    # Preparamos el payload para el RPC
     payload = {
-        "name": data["name"],
-        "email": data["email"],
-        "username": data["username"],
-        "password_hash": password_hash
+        "_name":     data["name"],
+        "_email":    data["email"],
+        "_username": data["username"],
+        "_password": data["password"],
     }
-    # Inserta vía PostgREST
-    r = requests.post(f"{POSTGREST_URL}/user", json=payload)
-    if r.status_code not in (200, 201):
-        return jsonify({"error": "Could not register", "detail": r.text}), r.status_code
-    return jsonify({"message": "User registered"}), 201
+
+    # Llamada al RPC register_user
+    r = pg(
+        "rpc/register_user",
+        method="POST",
+        headers=HEADERS,
+        json=payload
+    )
+
+    # PostgREST devuelve 204 No Content al ser función VOID
+    if r.status_code in (200, 204):
+        return jsonify({"message": "User registered"}), 201
+
+    # Reenviamos el error de PostgREST
+    return abort(r.status_code, r.text)
+
 
 
 @app.route("/login", methods=["POST"])
@@ -59,86 +79,85 @@ def login():
     if not data.get("username") or not data.get("password"):
         return jsonify({"error": "Missing credentials"}), 400
 
-    # Obtiene el usuario por username
-    r = requests.get(f"{POSTGREST_URL}/user?username=eq.{data['username']}")
+    # Traemos al usuario por username
+    r = pg(f"users?username=eq.{data['username']}",
+           headers={"Accept": "application/json"})
     if r.status_code != 200 or not r.json():
         return jsonify({"error": "Invalid username or password"}), 401
 
     user = r.json()[0]
-    if not check_password_hash(user["password_hash"], data["password"]):
+    if not verify_password(data["password"], user["password_hash"]):
         return jsonify({"error": "Invalid username or password"}), 401
 
-    token = create_jwt(user["id"])
+    token = create_token(user["id"])
     return jsonify({"token": token})
 
 
-@app.route("/profile", methods=["GET"])
-def get_profile():
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        return jsonify({"error": "Missing token"}), 401
-
-    token = auth.split(" ", 1)[1]
-    try:
-        payload = decode_jwt(token)
-    except jwt.ExpiredSignatureError:
-        return jsonify({"error": "Token expired"}), 401
-
-    user_id = payload["user_id"]
-    # Llamada a PostgREST incluyendo el JWT en la cabecera
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
-    r = requests.get(
-        f"{POSTGREST_URL}/user?id=eq.{user_id}",
-        headers=headers
-    )
-    if r.status_code != 200 or not r.json():
-        return jsonify({"error": "User not found"}), 404
-
-    user = r.json()[0]
-    # No exponemos password_hash
-    user.pop("password_hash", None)
-    return jsonify(user)
+def auth_required(fn):
+    """
+    Decorador para endpoints que requieren JWT válido.
+    Extrae el campo 'sub' como request.user_id.
+    """
+    def wrapper(*args, **kwargs):
+        auth = request.headers.get("Authorization", "")
+        parts = auth.split()
+        if len(parts) != 2 or parts[0] != "Bearer":
+            abort(401, description="Missing or malformed token")
+        try:
+            payload = decode_token(parts[1])
+        except jwt.ExpiredSignatureError:
+            abort(401, description="Token expired")
+        except Exception:
+            abort(401, description="Invalid token")
+        request.user_id = payload["sub"]
+        return fn(*args, **kwargs)
+    wrapper.__name__ = fn.__name__
+    return wrapper
 
 
-@app.route("/profile", methods=["PUT"])
-def update_profile():
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        return jsonify({"error": "Missing token"}), 401
-    try:
-        payload = decode_jwt(auth.split(" ", 1)[1])
-    except jwt.ExpiredSignatureError:
-        return jsonify({"error": "Token expired"}), 401
+@app.route("/profile", methods=["GET", "PUT"])
+@auth_required
+def profile():
+    uid = request.user_id
 
-    user_id = payload["user_id"]
-    data = request.json or {}
-    # Campos permitidos para editar
-    allowed = {"profile_picture", "biography", "location", "birth_date"}
-    update = {k: v for k, v in data.items() if k in allowed}
-    if not update:
-        return jsonify({"error": "No valid fields to update"}), 400
+    if request.method == "GET":
+        r = pg(f"users?id=eq.{uid}", headers={"Accept": "application/json"})
+        if r.status_code != 200 or not r.json():
+            abort(r.status_code)
+        user = r.json()[0]
+        user.pop("password_hash", None)
+        return jsonify(user)
 
-    # Patch a PostgREST, enviando también el JWT para que PostgREST sepa quién es el usuario
-    headers = {
-        "Authorization": f"Bearer {auth.split(' ',1)[1]}",   # el token extraído antes
-        "Prefer": "return=representation"
-    }
-    r = requests.patch(
-        f"{POSTGREST_URL}/user?id=eq.{user_id}",
-        json=update,
-        headers=headers
-    )
+    else:  # PUT
+        update = request.json or {}
+        # Campos permitidos para editar
+        allowed = {"profile_picture", "biography", "location", "birth_date"}
+        payload = {k: v for k, v in update.items() if k in allowed}
+        if not payload:
+            return jsonify({"error": "No valid fields to update"}), 400
 
-    if r.status_code not in (200, 204):
-        return jsonify({"error": "Update failed", "detail": r.text}), r.status_code
+        headers = {
+            **HEADERS,
+            "Prefer": "return=representation"
+        }
+        # Incluir el token en la cabecera para PostgREST
+        token = request.headers.get("Authorization").split()[1]
+        headers["Authorization"] = f"Bearer {token}"
 
-    # Devuelve el recurso actualizado (PostgREST regresa JSON)
-    updated = r.json()[0] if r.json() else {}
-    updated.pop("password_hash", None)
-    return jsonify(updated)
+        r = pg(f"users?id=eq.{uid}",
+               method="PATCH",
+               headers=headers,
+               json=payload)
+
+        if r.status_code not in (200, 204):
+            return abort(r.status_code, description=r.text)
+
+        # PostgREST en PUT con Prefer: return=representation devuelve lista
+        updated = r.json()[0] if r.json() else {}
+        updated.pop("password_hash", None)
+        return jsonify(updated)
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)

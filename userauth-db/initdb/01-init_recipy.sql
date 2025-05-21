@@ -1,3 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- 1. Esquema de la base de datos (opcional)
 CREATE SCHEMA IF NOT EXISTS recipy;

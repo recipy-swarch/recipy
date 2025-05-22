@@ -25,7 +25,7 @@ services:
     volumes:
       - ./recipe-ms/app:/app/app
     env_file:
-      - .env
+      - .env # <— esto carga JWT_SECRET y JWT_ALGO en recipe-ms
     depends_on:
       - recipe-db
     networks:

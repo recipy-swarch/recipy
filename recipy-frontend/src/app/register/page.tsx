@@ -2,6 +2,8 @@
 import { useState } from "react";
 
 export default function RegisterPage() {
+
+
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [username, setUsername] = useState("");
@@ -53,6 +55,38 @@ export default function RegisterPage() {
                 <div className="col-12 col-lg-8 col-xl-6">
                     <div className="card card-registration" style={{ borderRadius: '15px' }}>
                         <div className="card-body p-4 p-md-5">
+                            <h3 className="mb-4 pb-2 pb-md-0 mb-md-5 card-title">Registration Form</h3>
+                            <form>
+                                <div className="row">
+                                    <div className="col-md-6 mb-2">
+
+                                        <div data-mdb-input-init className="form-outline">
+                                            <label className="form-label" >Full Name</label>
+                                            <input
+                                                type="text"
+                                                id="firstName" 
+                                                className="form-control form-control-lg"
+                                                value={name}
+                                                onChange={(e) => setName(e.target.value)}
+                                                placeholder="Full Name"
+                                            />
+                                        </div>
+
+                                    </div>
+                                    <div className="col-md-6 mb-2">
+
+                                        <div data-mdb-input-init className="form-outline">
+                                            <label className="form-label" >user name</label>
+                                            <input
+                                                type="text"
+                                                value={username}
+                                                id="lastName" 
+                                                className="form-control form-control-lg"
+                                                onChange={(e) => setUsername(e.target.value)}
+                                                placeholder="User Name"
+                                            />
+                                        </div>
+                                    </div>
                             <h3 className="mb-4 pb-2 pb-md-0 mb-md-5 card-title">Registro</h3>
                             <form onSubmit={handleRegister}>
                                 <div className="mb-3">
@@ -65,6 +99,38 @@ export default function RegisterPage() {
                                         required
                                     />
                                 </div>
+
+                                <div className="row">
+                                    <div className="col-md-6 d-flex pb-2 align-items-center">
+
+                                        <div data-mdb-input-init className="form-outline w-100">
+                                            <label htmlFor="birthdayDate" className="form-label">location</label>
+                                                  <input
+                                                    type="text"
+                                                    value={location}
+                                                    className="form-control form-control-lg" 
+                                                    id="birthdayDate"
+                                                    onChange={(e) => setLocation(e.target.value)}
+                                                    placeholder="Location"
+                                                />
+
+                                        </div>
+
+                                    </div>
+
+                                    <div className="col-md-6 pb-2 d-flex align-items-center">
+                                        <div data-mdb-input-init className="form-outline w-100">
+                                            <label className="form-label">Birth date</label>
+                                            <DatePicker 
+                                                selected={selectedDate} 
+                                                onChange={(date: Date | null) => {
+                                                    if (date) setSelectedDate(date);
+                                                }} 
+                                                isClearable={false}
+                                                className="form-control form-control-lg"
+                                            />
+                                        </div>
+                                    </div>
                                 <div className="mb-3">
                                     <label className="form-label">Correo electrónico</label>
                                     <input
@@ -75,6 +141,24 @@ export default function RegisterPage() {
                                         required
                                     />
                                 </div>
+
+                                <div className="row">
+                                    <div className="col-md-12 pb-2">
+
+                                        <div data-mdb-input-init className="form-outline">
+                                            <label className="form-label" htmlFor="emailAddress">Email</label>
+                                                  <input
+                                                        type="email"
+                                                        value={email}
+                                                        id="emailAddress" 
+                                                        className="form-control form-control-lg"
+                                                        onChange={(e) => setEmail(e.target.value)}
+                                                        placeholder="Email"
+                                                    />
+                                        </div>
+
+                                    </div>
+
                                 <div className="mb-3">
                                     <label className="form-label">Nombre de usuario</label>
                                     <input
@@ -85,6 +169,57 @@ export default function RegisterPage() {
                                         required
                                     />
                                 </div>
+                                <div className="row">
+                                    <div className="col-md-6 pb-2">
+                                        <div data-mdb-input-init className="form-outline">
+                                            <label className="form-label" htmlFor="password">Password</label>
+                                            <input
+                                                type="password"
+                                                id="password"
+                                                className="form-control form-control-lg"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                placeholder="Password"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="col-md-6 pb-2">
+                                        <div data-mdb-input-init className="form-outline">
+                                            <label className="form-label" htmlFor="repeatPassword">Repeat your Password</label>
+
+                                            <input
+                                                type="password"
+                                                value={repeatPassword}
+                                                id="repeatPassword"
+                                                className="form-control form-control-lg"
+                                                onChange={(e) => setRepeatPassword(e.target.value)}
+                                                placeholder="Repeat Password"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="col-12">
+                                        <p className={passwordMatch ? "text-success" : "text-danger"}>
+                                            {password && repeatPassword
+                                                ? passwordMatch
+                                                    ? "Las contraseñas coinciden."
+                                                    : "Las contraseñas no coinciden."
+                                                : ""}
+                                        </p>
+
+                                        <ul>
+                                            <li className={isLengthValid ? "text-success" : "text-danger"}>
+                                                Debe tener al menos 8 caracteres
+                                            </li>
+                                            <li className={hasUpperAndNumber ? "text-success" : "text-danger"}>
+                                                Debe tener al menos una mayúscula y un número
+                                            </li>
+                                            <li className={hasSpecialChar ? "text-success" : "text-danger"}>
+                                                Debe tener al menos un carácter especial (#, @, !, etc)
+                                            </li>
+                                        </ul>
+                                    </div>
                                 <div className="mb-3">
                                     <label className="form-label">Contraseña</label>
                                     <input
@@ -104,6 +239,16 @@ export default function RegisterPage() {
                                         onChange={e => setRepeatPassword(e.target.value)}
                                         required
                                     />
+                                </div>
+
+                                <div className="col-md-6 d-flex align-items-center justify-content-center pt-2 mx-auto">
+
+                                    <button 
+                                    type="button" 
+                                    className="btn btn-lg w-100 special-btn"
+                                    onClick={handleRegister}>
+                                        Register
+                                    </button>
                                 </div>
                                 {error && <div className="alert alert-danger">{error}</div>}
                                 {success && <div className="alert alert-success">{success}</div>}

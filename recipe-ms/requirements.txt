@@ -3,3 +3,4 @@ strawberry-graphql[fastapi]
 uvicorn
 motor              # driver asíncrono para MongoDB
 python-dotenv      # carga de variables de entorno desde .env
+PyJWT # para el control de autorizaciones

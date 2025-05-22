@@ -2,6 +2,7 @@
 import os
 import datetime
 import jwt
+from Flask import jwt_flask
 from passlib.context import CryptContext
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -17,7 +18,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_token(sub: int) -> str:
     payload = {
-        "sub": sub,
+        "sub": str(sub),            # ← obligamos a que sea string
         "role": "authenticator", # <-- rol de autenticados que definimos en PostgREST
         "aud":  "postgrest",  # <<< coincide con jwt-aud en postgrest.conf
         "exp":  datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXP_HRS)
@@ -31,3 +32,21 @@ def decode_token(token: str) -> dict:
         algorithms=[JWT_ALGO],
         audience="postgrest"              # <<< debe coincidir con jwt-aud
     )
+
+def test_register_duplicate(client):
+    # Registro inicial
+    client.post("/register", json={
+        "name": "Dup",
+        "email": "dup@example.com",
+        "username": "dupuser",
+        "password": "pass"
+    })
+    # Intento duplicado
+    resp = client.post("/register", json={
+        "name": "Dup",
+        "email": "dup@example.com",
+        "username": "dupuser",
+        "password": "pass"
+    })
+    assert resp.status_code == 409
+    assert "already" in resp.json.get("error","").lower()

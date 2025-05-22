@@ -44,3 +44,8 @@ CREATE INDEX idx_relation_following
 
 CREATE INDEX idx_relation_user
   ON relation(user_id);
+
+
+
+
+

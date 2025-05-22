@@ -57,19 +57,21 @@ async function bootstrap() {
     try {
       const authHeader = req.headers['authorization'] || '';
       console.log('Authorization header:', authHeader);
-      if (!authHeader) {
-        return next(new Error('Missing Authorization header'));
+      if (authHeader) {
+        // sólo llamamos a /me si hay token
+        const { data } = await axios.get(
+          `${process.env.USERAUTH_MS_URL}/me`,
+          { headers: { Authorization: authHeader } }
+        );
+        console.log('Response from /me:', data);
+        req.userId = data.id;
       }
-      // Fíjate que enviamos "Authorization" con mayúscula porque Flask lo espera así
-      const { data } = await axios.get(
-        `${process.env.USERAUTH_MS_URL}/me`,
-        { headers: { Authorization: authHeader } }
-      );
-      console.log('Response from /me:', data);
-      req.userId = data.id;
-      next();
+      // si no hay authHeader dejamos userId indefinido y continuamos
+      return next();
     } catch (err) {
-      next(err);
+      // loguear y continuar sin userId si falla la llamada
+      console.warn('Error fetching user id:', err);
+      return next();
     }
   };
 

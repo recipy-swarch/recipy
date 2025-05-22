@@ -1,8 +1,6 @@
 # userauth-ms/auth.py
 import os
 import datetime
-import jwt
-from Flask import jwt_flask
 from passlib.context import CryptContext
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -16,22 +14,29 @@ def hash_password(plain: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_ctx.verify(plain, hashed)
 
-def create_token(sub: int) -> str:
-    payload = {
-        "sub": str(sub),            # ← obligamos a que sea string
-        "role": "authenticator", # <-- rol de autenticados que definimos en PostgREST
-        "aud":  "postgrest",  # <<< coincide con jwt-aud en postgrest.conf
-        "exp":  datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXP_HRS)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+# def create_token(sub: int) -> str:
+#     payload = {
+#         "sub": str(sub),            # ← obligamos a que sea string
+#         "role": "authenticator", # <-- rol de autenticados que definimos en PostgREST
+#         "aud":  "postgrest",  # <<< coincide con jwt-aud en postgrest.conf
+#         "exp":  datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXP_HRS)
+#     }
+#     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
-def decode_token(token: str) -> dict:
-    return jwt.decode(
-        token,
-        JWT_SECRET,
-        algorithms=[JWT_ALGO],
-        audience="postgrest"              # <<< debe coincidir con jwt-aud
-    )
+# def decode_token(token: str) -> dict:
+#     return jwt.decode(
+#         token,
+#         JWT_SECRET,
+#         algorithms=[JWT_ALGO],
+#         audience="postgrest"              # <<< debe coincidir con jwt-aud
+#     )
+
+# def get_token_sub(token: str) -> int:
+#     """
+#     Devuelve el campo 'sub' (id de usuario) del JWT.
+#     """
+#     payload = decode_token(token)
+#     return int(payload.get("sub"))
 
 def test_register_duplicate(client):
     # Registro inicial

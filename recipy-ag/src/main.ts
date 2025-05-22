@@ -55,11 +55,17 @@ async function bootstrap() {
   // 2. Middleware que llama a /me y guarda el id
   const addUserIdHeader = async (req: any, _res: any, next: any) => {
     try {
-      const auth = req.headers['authorization'];
+      const authHeader = req.headers['authorization'] || '';
+      console.log('Authorization header:', authHeader);
+      if (!authHeader) {
+        return next(new Error('Missing Authorization header'));
+      }
+      // Fíjate que enviamos "Authorization" con mayúscula porque Flask lo espera así
       const { data } = await axios.get(
         `${process.env.USERAUTH_MS_URL}/me`,
-        { headers: { authorization: auth } }
+        { headers: { Authorization: authHeader } }
       );
+      console.log('Response from /me:', data);
       req.userId = data.id;
       next();
     } catch (err) {
@@ -91,23 +97,42 @@ async function bootstrap() {
 
   // 3. Proxy específico para GraphQL de recetas
   app.use(
-    '/recipe/graphql',
+    '/recipe',
+    // Log the original request body and headers before any modification
+    (req: any, _res: any, next: any) => {
+      console.log('--- [RECIPE] Incoming request ---');
+      console.log('Headers:', req.headers);
+      console.log('Body:', req.body);
+      next();
+    },
     addUserIdHeader,  // <-- primero obtenemos el id
     jsonParser,       // <-- luego el raw body
     processImages,    // <-- subimos imágenes y actualizamos req.rawBody
+    // Log the modified request body and headers after all modifications
+    (req: any, _res: any, next: any) => {
+      console.log('--- [RECIPE] Modified request ---');
+      console.log('Headers:', req.headers);
+      console.log('Body:', req.body);
+      console.log('RawBody:', req.rawBody);
+      next();
+    },
     createProxyMiddleware({
       target: process.env.RECIPE_MS_URL,
       changeOrigin: true,
-      //pathRewrite: { '^/recipe': '' }, // quita el prefijo /recipe
+      pathRewrite: { '^/recipe': '' }, // quita el prefijo /recipe
       onProxyReq(proxyReq, req: any) {
+        // 1) Preparamos todos los headers
         if (req.rawBody) {
-          // reescribimos el body tal cual lo recibimos
           proxyReq.setHeader('Content-Type', 'application/json');
           proxyReq.setHeader('Content-Length', Buffer.byteLength(req.rawBody));
-          proxyReq.write(req.rawBody);
         }
         if (req.userId) {
-          proxyReq.setHeader('id', req.userId); // <-- inyectamos el id
+          proxyReq.setHeader('id', req.userId); // inyectamos el id antes de escribir el body
+        }
+
+        // 2) Finalmente escribimos el body crudo
+        if (req.rawBody) {
+          proxyReq.write(req.rawBody);
         }
       },
     }),

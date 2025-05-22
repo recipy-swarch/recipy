@@ -66,6 +66,7 @@ class RecipeService {
     }, token: string): Promise<IRecipe> => {
         
         console.log("Creating recipe with data:", this.apiUrl, data);
+        console.log("Token:", token);
         const response = await fetch(
             `${this.apiUrl}/recipe/graphql/create_recipe`,
             {
@@ -77,6 +78,8 @@ class RecipeService {
                 body: JSON.stringify(data),
             }
         );
+
+        console.log("Response:", response);
 
         if (!response.ok) {
             const text = await response.text();

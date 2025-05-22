@@ -1,7 +1,38 @@
+"use client"
+
+import React, { useState } from "react";
 import "./login.css";
 import loginHero from '../components/login-hero.jpg';
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const router = useRouter();
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+        try {
+            const res = await fetch("http://localhost:5000/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password }),
+            });
+            const data = await res.json();
+            if (res.ok && data.token) {
+                localStorage.setItem("token", data.token);
+                // Redirige o muestra éxito aquí si quieres
+                router.push("/"); // Redirige a la raíz
+            } else {
+                setError(data.error || "Error al iniciar sesión");
+            }
+        } catch (err) {
+            setError("Error de red o servidor");
+        }
+    };
+
     return (
         <div className="container-fluid h-100 p-0">
             <div className="row d-flex g-0" style={{ height: '100vh' }}>
@@ -16,14 +47,17 @@ export default function LoginPage() {
                     </div>
                 </div>
                 <div className="d-flex  col-md-8 col-lg-8 col-xl-8 align-items-center justify-content-center h-100 form-section">
-                    <form className="container col-10 col-md-8 col-xl-6 login-container">
+                    <form className="container col-10 col-md-8 col-xl-6 login-container" onSubmit={handleLogin}>
                         <div className="form-outline mb-2">
-                            <label className="form-label" >Email address</label>
+                            <label className="form-label">Username</label>
                             <input
-                                type="email"
+                                type="text"
                                 id="form3Example3"
                                 className="form-control form-control-lg"
                                 placeholder="Enter a valid email address"
+                                value={username}
+                                onChange={e => setUsername(e.target.value)}
+                                required
                             />
 
                         </div>
@@ -36,6 +70,9 @@ export default function LoginPage() {
                                 id="form3Example4"
                                 className="form-control form-control-lg"
                                 placeholder="Enter password"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                required
                             />
 
                         </div>
@@ -54,13 +91,17 @@ export default function LoginPage() {
                             </div>
                             <a href="#!" className="link-btn">Forgot password?</a>
                         </div>
-
+                        {error && (
+                            <div className="alert alert-danger mt-2" role="alert">
+                                {error}
+                            </div>
+                        )}
                         <div className="text-center text-lg-center mt-2 pt-2 ">
                             <button
-                                type="button"
+                                type="submit"
                                 className="btn btn-lg w-100 special-btn"
                             >
-                                Login
+                                Iniciar Sesion
                             </button>
                             <p className="small fw-bold mt-2 pt-1 mb-0">
                                 Don't have an account?{" "}

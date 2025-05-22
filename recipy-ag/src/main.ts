@@ -77,17 +77,21 @@ async function bootstrap() {
   const processImages = async (req: any, _res: any, next: any) => {
     try {
       if (req.body?.images && Array.isArray(req.body.images)) {
+        console.log('Uploading images to Imgur:', req.body.images);
         const links = await Promise.all(
           req.body.images.map(async (img: string) => {
             const { data } = await axios.post(
               `${process.env.IMGUR_API_URL}/imgur/upload`,
               { image: img }
             );
+            console.log('Imgur response:', data);
             return data.data.link;
           })
         );
         req.body.images = links;
+        console.log('Updated images in body:', req.body.images);
         req.rawBody = JSON.stringify(req.body);
+        console.log('Updated raw body:', req.rawBody);
       }
       next();
     } catch (err) {

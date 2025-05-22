@@ -9,7 +9,7 @@ class RecipeService {
             throw new Error('API URL is not defined')
         }
     }
-      fetchAllRecipes = async (): Promise<IRecipe[]> => {
+    fetchAllRecipes = async (): Promise<IRecipe[]> => {
         const url = `${this.apiUrl}/recipe/graphql/get_recipes`;
         console.log("Fetching all recipes from:", url);
 
@@ -19,13 +19,19 @@ class RecipeService {
         });
 
         if (!response.ok) {
-        const text = await response.text();
-        console.error("Error fetching recipes:", text);
-        throw new Error(`Error ${response.status}`);
+            const text = await response.text();
+            console.error("Error fetching recipes:", text);
+            throw new Error(`Error ${response.status}`);
         }
 
-        const data = (await response.json()) as IRecipe[];
-        return data;
+        const data = await response.json();
+
+        if (data.error) {
+            console.error('Error creating recipe:', data.error);
+            throw new Error(`Error ${data.error}`);
+        }
+
+        return data as IRecipe[];
     };
 
     fetchUserRecipes = async (): Promise<IRecipe[]> => {
@@ -37,8 +43,16 @@ class RecipeService {
             },
         });
         if (!response.ok) throw new Error(`Error ${response.status}`);
-        const data: IRecipe[] = await response.json();
-        return data;
+        
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error('Error creating recipe:', data.error);
+            throw new Error(`Error ${data.error}`);
+        }
+
+        return data as IRecipe[];
         };
 
     createRecipe = async (data: {
@@ -62,9 +76,16 @@ class RecipeService {
         );
 
         if (!response.ok) {
-        const text = await response.text();
-        console.error('Error creating recipe:', text);
-        throw new Error(`Error ${response.status}`);
+            const text = await response.text();
+            console.error('Error creating recipe:', text);
+            throw new Error(`Error ${response.status}`);
+        }
+
+        const data_r = await response.json();
+
+        if (data_r.error) {
+            console.error('Error creating recipe:', data_r.error);
+            throw new Error(`Error ${data_r.error}`);
         }
 
         return (await response.json()) as IRecipe;

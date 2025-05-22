@@ -35,9 +35,7 @@ export default function RecipeForm() {
       newErrors.steps = "Debes agregar al menos un paso"
     }
 
-    if (images.length === 0) {
-      newErrors.images = "Debes subir al menos una imagen"
-    }
+    
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -59,8 +57,6 @@ export default function RecipeForm() {
       formData.append("title", title)
       formData.append("prep_time", prepTime)
       formData.append("portions", portions.toString())
-      formData.append("description", description)
-      formData.append("ingredients", JSON.stringify(filteredIngredients))
       formData.append("steps", JSON.stringify(filteredSteps))
 
       // Append images
@@ -71,15 +67,7 @@ export default function RecipeForm() {
       await createRecipe(formData)
 
       // Reset form after successful submission
-      formRef.current?.reset()
-      setTitle("")
-      setPrepTime("")
-      setPortions(1)
-      setDescription("")
-      setIngredients([""])
-      setSteps([""])
-      setImages([])
-      setPreviews([])
+      
 
       alert("¡Receta creada con éxito!")
     } catch (error) {

@@ -1,13 +1,19 @@
 # userauth-ms/app.py
 
 import os
-import datetime
 import requests
-import jwt
 from flask import Flask, request, jsonify, abort
 from flask_cors import CORS
-from auth import hash_password, verify_password, create_token, decode_token
+from datetime import timedelta
+from auth import hash_password, verify_password
 from dotenv import load_dotenv
+
+from flask_jwt_extended import (
+    create_access_token,
+    jwt_required,
+    get_jwt_identity,
+    JWTManager,
+)
 
 # Carga variables de entorno de ../.env
 load_dotenv()
@@ -20,9 +26,14 @@ PGRST = os.getenv("PGRST_URL", "").rstrip("/")  # ej: http://userauth-postgrest:
 HEADERS = {"Content-Type": "application/json"}
 
 # JWT settings
-JWT_SECRET = os.getenv("JWT_SECRET", "change-me")
-JWT_ALGORITHM = "HS256"
-JWT_EXP_HOURS = int(os.getenv("JWT_EXP_HOURS", "24"))
+# JWT_SECRET = os.getenv("JWT_SECRET", "change-me")
+# JWT_ALGORITHM = "HS256"
+# JWT_EXP_HOURS = int(os.getenv("JWT_EXP_HOURS", "24"))
+
+
+app.config['JWT_SECRET_KEY'] = os.getenv("JWT_SECRET", "change-me")
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=int(os.getenv("JWT_EXP_HOURS", "24")))
+jwt = JWTManager(app)
 
 
 def pg(path, **kw):
@@ -100,36 +111,14 @@ def login():
     if not verify_password(data["password"], user["password_hash"]):
         return jsonify({"error": "Invalid username or password"}), 401
 
-    token = create_token(user["id"])
+    token = create_access_token(identity=user["id"])
     return jsonify({"token": token})
 
 
-def auth_required(fn):
-    """
-    Decorador para endpoints que requieren JWT válido.
-    Extrae el campo 'sub' como request.user_id.
-    """
-    def wrapper(*args, **kwargs):
-        auth = request.headers.get("Authorization", "")
-        parts = auth.split()
-        if len(parts) != 2 or parts[0] != "Bearer":
-            abort(401, description="Missing or malformed token")
-        try:
-            payload = decode_token(parts[1])
-        except jwt.ExpiredSignatureError:
-            abort(401, description="Token expired")
-        except Exception:
-            abort(401, description="Invalid token")
-        request.user_id = payload["sub"]
-        return fn(*args, **kwargs)
-    wrapper.__name__ = fn.__name__
-    return wrapper
-
-
 @app.route("/profile", methods=["GET", "PUT"])
-@auth_required
+@jwt_required()
 def profile():
-    uid = request.user_id
+    uid = get_jwt_identity()
 
     if request.method == "GET":
         r = pg(f"users?id=eq.{uid}", headers={"Accept": "application/json"})
@@ -168,6 +157,20 @@ def profile():
         updated.pop("password_hash", None)
         return jsonify(updated)
 
+@app.route("/me", methods=["GET"])
+@jwt_required()
+def me():
+    """
+    Endpoint para obtener el id de usuario ('sub') del JWT enviado.
+    """
+    return jsonify({"id": str(get_jwt_identity())})
+
+@jwt.expired_token_loader
+def my_expired_token_callback(jwt_header, jwt_payload):
+    return jsonify({
+        "error": "Token expirado",
+        "detail": "Por favor, vuelve a iniciar sesión."
+    }), 401
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))

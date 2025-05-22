@@ -2,7 +2,6 @@
 import os
 import datetime
 import jwt
-from Flask import jwt_flask
 from passlib.context import CryptContext
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")

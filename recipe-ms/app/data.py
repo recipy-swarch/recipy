@@ -17,7 +17,8 @@ def load_initial_data():
                 "Boil pasta.",
                 "Cook meat.",
                 "Mix together."
-            ]
+            ],
+            user_id= "usuario123",
         ),
         Recipe(
             id=2,
@@ -30,7 +31,8 @@ def load_initial_data():
                 "Butter bread.",
                 "Add cheese.",
                 "Grill."
-            ]
+            ],
+            user_id= "usuario1213"
         ),
         Recipe(
             id=3,
@@ -42,6 +44,7 @@ def load_initial_data():
             steps=[
                 "Mix ingredients.",
                 "Fry both sides."
-            ]
+            ],
+            user_id= "usuario1213"
         ),
     ]

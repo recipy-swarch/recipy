@@ -1,17 +1,29 @@
-from fastapi import FastAPI
+from dotenv import load_dotenv
+load_dotenv()   # <- esto importa las JWT_SECRET y JWT_ALGO desde .env
+
+from fastapi import FastAPI, Request
 from strawberry.fastapi import GraphQLRouter
 import strawberry
 
 from app.schema import Query, Mutation
 from app.db import client, get_collection
 from app.initial_data import get_initial_recipes
-from app.data import load_initial_data  # tu función que pobla la lista en memoria
+from app.data import load_initial_data  # función que pobla la lista en memoria
 
 # 1. Definir el esquema
 schema = strawberry.Schema(query=Query, mutation=Mutation)
-graphql_app = GraphQLRouter(schema)
 
-# 2. Crear la app e incluir el router
+# 2. Definimos un context_getter tipado para que FastAPI inyecte Request
+def get_context(request: Request):
+    return {"request": request}
+
+graphql_app = GraphQLRouter(
+    schema=schema,
+    graphiql=True,               # opcional: habilitar GraphiQL en /graphql
+    allow_queries_via_get=True,  # <-- permite consultas GET
+    context_getter=get_context   # <-- use nuestra función con tipo Request
+)
+
 app = FastAPI(title="Recipe Service")
 app.include_router(graphql_app, prefix="/graphql")
 

@@ -25,7 +25,7 @@ services:
     volumes:
       - ./recipe-ms/app:/app/app
     env_file:
-      - .env
+      - .env # <— esto carga JWT_SECRET y JWT_ALGO en recipe-ms
     depends_on:
       - recipe-db
     networks:
@@ -70,8 +70,8 @@ services:
        - .env
     volumes:
       - ./userauth-postgrest/postgrest.conf:/etc/postgrest.conf:ro
-      - ./recipe-db/data:/data/db  # Persistencia de datos
-      - ./recipe-db/initdb:/docker-entrypoint-initdb.d:ro # Comando de inicialización
+      #- ./recipe-db/data:/data/db  # Persistencia de datos
+      #- ./recipe-db/initdb:/docker-entrypoint-initdb.d:ro # Comando de inicialización
     
     ports:
       - "3001:3000"

@@ -9,97 +9,115 @@ class RecipeService {
             throw new Error('API URL is not defined')
         }
     }
+    fetchAllRecipes = async (): Promise<IRecipe[]> => {
+        const url = `${this.apiUrl}/recipe/graphql/get_recipes`;
+        console.log("Fetching all recipes from:", url);
 
-    fetchRecipes = async (): Promise<IRecipe[]> => {
-        try {
-            const response = await fetch(`${this.apiUrl}/recipe/graphql`, {
-                next: { revalidate:5 }, // Cache just after 5 seconds
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ query: `
-                    query {
-                        recipes {
-                            id
-                            title
-                            prepTime
-                            images
-                            video
-                            portions
-                            steps
-                        }
-                    }
-                `
-                }),
-            })
+        const response = await fetch(url, {
+        method: "GET",
+        // No necesitas headers de auth si devuelves todo
+        });
 
-            const result = await response.json()
-            if (result.errors) {
-                console.error('GraphQL errors:', result.errors)
-                throw new Error('Error fetching recipes')
-            }
-
-            return result.data.recipes as IRecipe[]
-        } catch (error) {
-            console.error('Error fetching recipes:', error)
-            throw error
+        if (!response.ok) {
+            const text = await response.text();
+            console.error("Error fetching recipes:", text);
+            throw new Error(`Error ${response.status}`);
         }
-    }
-    createrecipe = async (formData: FormData): Promise<void> => {
-        try {
-            const response = await fetch(`${this.apiUrl}/recipe/graphql`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    query: `
-                        mutation AddRecipe($title: String!,$prepTime: String!,$portions: Int!, $steps: [String!]!){
-                            addRecipe(
-                                recipe: {
-                                title: $title
-                                prepTime: $prepTime
-                                portions: $portions
-                                steps: $steps
-                                }
-                            ) {
-                                id
-                                title
-                                prepTime
-                                portions
-                                steps
-                            }
-                        }
 
-                    `,
-                    variables: {
-                       
-                        title: formData.get('title'),
-                        prepTime: formData.get('prep_time'),
-                        portions: Number(formData.get('portions')),
-                        steps: JSON.parse(formData.get('steps') as string),
-                        
-                    },
-                }),
-            })
+        const data = await response.json();
 
-            if (!response.ok) {
-                const text = await response.text()
-                console.error('Error response:', text)
-                throw new Error('Error creating recipe')
-            }
-
-            const result = await response.json()
-            if (result.errors) {
-                console.error('GraphQL errors:', result.errors)
-                throw new Error(result.errors[0]?.message || 'Error creating recipe')
-            }
-        } catch (error) {
-            console.error('Error creating recipe:', error)
-            throw error
+        if (data.error) {
+            console.error('Error creating recipe:', data.error);
+            throw new Error(`Error ${data.error}`);
         }
+
+        return data as IRecipe[];
+    };
+
+    fetchUserRecipes = async (): Promise<IRecipe[]> => {
+        const response = await fetch(`${this.apiUrl}/recipe/graphql/get_recipebyuser`, {
+            method: "GET",
+            headers: {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json",
+            },
+        });
+        if (!response.ok) throw new Error(`Error ${response.status}`);
+        
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error('Error creating recipe:', data.error);
+            throw new Error(`Error ${data.error}`);
+        }
+
+        return data as IRecipe[];
+        };
+
+    // Helper que lee un File y devuelve sólo el payload Base64
+    private readFileAsBase64(file: File): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                // reader.result = "data:<mime>;base64,<BASE64…>"
+                const base64 = (reader.result as string).split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
     }
+
+    private async formDataToJson(formData: FormData) {
+        const obj: any = {};
+        const images: string[] = [];
+        for (const [key, val] of formData.entries()) {
+            if (val instanceof File) {
+                images.push(await this.readFileAsBase64(val));
+            } else {
+                obj[key] = val;
+            }
+        }
+        // El Gateway espera un campo `images: string[]`
+        if (images.length) obj.images = images;
+        // parsea steps si viene como JSON string
+        if (typeof obj.steps === 'string') {
+            try { obj.steps = JSON.parse(obj.steps); } catch {}
+        }
+        return obj;
+    }
+
+    createRecipe = async (formData: FormData, token: string): Promise<IRecipe> => {
+        const dataObj = await this.formDataToJson(formData);
+        console.log("Body JSON listo:", dataObj);
+        const res = await fetch(`${this.apiUrl}/recipe/graphql/create_recipe`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(dataObj),
+        });
+
+        console.log("Response:", res);
+
+        if (!res.ok) {
+            const text = await res.text();
+            console.error('Error creating recipe:', text);
+            throw new Error(`Error ${res.status}`);
+        }
+
+        const data_r = await res.json();
+
+        if (data_r.error) {
+            console.error('Error creating recipe:', data_r.error);
+            throw new Error(`Error ${data_r.error}`);
+        }
+
+        return data_r as IRecipe;
+    };
+
     
 }
 

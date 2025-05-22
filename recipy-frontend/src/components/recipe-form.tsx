@@ -52,6 +52,7 @@ export default function RecipeForm() {
       // Filter out empty ingredients and steps
       const filteredIngredients = ingredients.filter((i) => i.trim())
       const filteredSteps = steps.filter((s) => s.trim())
+      
 
       const formData = new FormData()
       formData.append("title", title)
@@ -63,8 +64,13 @@ export default function RecipeForm() {
       images.forEach((image, index) => {
         formData.append(`image_${index}`, image)
       })
+      const token = localStorage.getItem("token")
+      if (token){
+        await createRecipe(formData,token)
+      }
+      
 
-      await createRecipe(formData)
+      
 
       // Reset form after successful submission
       

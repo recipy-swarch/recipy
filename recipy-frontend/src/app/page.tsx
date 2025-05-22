@@ -1,10 +1,27 @@
+"use client";
 
-import recipeService from '@/services/RecipeService'
 import styles from "./page.module.css";
 import Link from "next/link";
-        
-export default async function RecipesPage() {
-    const recipes = await recipeService.fetchRecipes()
+import { fetchAllRecipes } from "@/lib/actions";
+
+import { useEffect, useState } from "react";
+
+export default function RecipesPage() {
+    const [recipes, setRecipes] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const getRecipes = async () => {
+            const result = await fetchAllRecipes();
+            if (result.success) {
+                setRecipes(result.recipes);
+            }
+            setLoading(false);
+        };
+        getRecipes();
+    }, []);
+
+    if (loading) return <div>Cargando recetas...</div>;
 
     return (
         <div className="container mt-4">
@@ -23,6 +40,6 @@ export default async function RecipesPage() {
                 ))}
             </div>
         </div>
-    )
+    );
 }
 

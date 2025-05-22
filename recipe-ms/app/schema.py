@@ -13,13 +13,11 @@ from fastapi import HTTPException
 
 def get_current_user_id(info) -> str:
     req = info.context["request"]
-    # Primero miro Authorization
-    auth = req.headers.get("authorization")
-    if auth:
-        # si viene sin Bearer, asumo que es directamente el user_id
-        if not auth.lower().startswith("bearer"):
-            return auth
-        # o parseas tu Bearer token aquí…
+    # 1) El API-Gateway ya inyecta aquí el user_id
+    user_id = req.headers.get("id")
+    if user_id:
+        return str(user_id)
+    # 2) Si no, rechazamos
     raise HTTPException(status_code=401, detail="Authentication required")
 
 

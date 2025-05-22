@@ -1,7 +1,7 @@
 export interface IRecipe {
     id: string;
     title: string;
-    prepTime: string;
+    prep_time: string;
     images?: string[];
     video?: string;
     portions: number;

@@ -64,6 +64,8 @@ async def get_recipes(request: Request):
     for doc in raw_docs:
         doc["id"] = str(doc.pop("_id"))
 
+        print("Identificador de receta:", doc["id"])
+
         # Si falta user_id, asignamos un valor por defecto
         if "user_id" not in doc:
             doc["user_id"] = ""          # o "anonymous", o None si haces Optional
@@ -101,6 +103,7 @@ async def create_recipe(request: Request, payload: dict = Body(...)):
     try:
         info = type("Info", (), {"context": {"request": request}})
         user_id = get_current_user_id(info)
+        print("Encontramos user_id:", user_id)
     except HTTPException as e:
         raise e
 
@@ -125,8 +128,16 @@ async def create_recipe(request: Request, payload: dict = Body(...)):
         "images":    images,
         "video":     video,
     }
+
+    print("Receta a insertar:", doc)
+
     coll = get_collection("recipes")
+
+    print("Colección de recetas:", coll)
+
     res = await coll.insert_one(doc)
+
+    print("Insertado:", res.inserted_id)
 
     # 4) Leer de vuelta y mapear _id → id
     saved = await coll.find_one({"_id": res.inserted_id})

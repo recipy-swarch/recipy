@@ -17,7 +17,11 @@ export default function LoginPage() {
         setError("");
         const result = await loginUser({ username, password });
         if (result.success) {
-            router.push("/");  // Ajusta la ruta de destino según tu flujo
+            if (result.token) {
+                router.push("/");  // Ajusta la ruta de destino según tu flujo
+                localStorage.setItem("token",result.token);
+            }
+            
         } else {
             setError(result.error as string || "Error de inicio de sesión");
         }

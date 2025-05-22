@@ -1,4 +1,4 @@
-"use server"
+
 
 import { IUserRegister } from "@/interfaces/IUser";
 

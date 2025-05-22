@@ -1,3 +1,4 @@
+
 import { IRecipe} from '@/interfaces/IRecipe'
 
 class RecipeService {
@@ -38,7 +39,7 @@ class RecipeService {
         const response = await fetch(`${this.apiUrl}/recipe/graphql/get_recipebyuser`, {
             method: "GET",
             headers: {
-            "Authorization": "usuario123",
+            "Authorization": "Bearer token",
             "Content-Type": "application/json",
             },
         });
@@ -62,17 +63,19 @@ class RecipeService {
         steps: string[];
         images?: string[];
         video?: string;
-    }): Promise<IRecipe> => {
+    }, token: string): Promise<IRecipe> => {
+        
+        console.log("Creating recipe with data:", this.apiUrl, data);
         const response = await fetch(
-        `${this.apiUrl}/recipe/graphql/create_recipe`,
-        {
-            method: 'POST',
-            headers: {
-            'Content-Type': 'application/json',
-            'Authorization': localStorage.getItem('userId')!  // ó Authorization: Bearer …
-            },
-            body: JSON.stringify(data),
-        }
+            `${this.apiUrl}/recipe/graphql/create_recipe`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data),
+            }
         );
 
         if (!response.ok) {

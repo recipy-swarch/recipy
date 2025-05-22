@@ -1,7 +1,6 @@
 from dotenv import load_dotenv
 load_dotenv()   # <- esto importa las JWT_SECRET y JWT_ALGO desde .env
 
-from fastapi import FastAPI, Request
 from strawberry.fastapi import GraphQLRouter
 import strawberry
 
@@ -9,7 +8,12 @@ from app.schema import Query, Mutation
 from app.db import client, get_collection
 from app.initial_data import get_initial_recipes
 from app.data import load_initial_data  # función que pobla la lista en memoria
-
+from fastapi import FastAPI, Request, HTTPException, Body
+from typing import List
+from app.db import get_collection
+from app.schema import Recipe  # tu dataclass Strawberry
+from app.schema import get_current_user_id  # tu helper
+from datetime import datetime
 # 1. Definir el esquema
 schema = strawberry.Schema(query=Query, mutation=Mutation)
 
@@ -50,3 +54,92 @@ async def on_startup():
     # c) Carga en memoria de tu lista Python
     load_initial_data()
     print("Datos iniciales cargados en memoria.")
+
+@app.get("/graphql/get_recipes", response_model=List[Recipe])
+async def get_recipes(request: Request):
+    coll = get_collection("recipes")
+    raw_docs = await coll.find({}).to_list(100)
+
+    recipes: List[Recipe] = []
+    for doc in raw_docs:
+        doc["id"] = str(doc.pop("_id"))
+
+        print("Identificador de receta:", doc["id"])
+
+        # Si falta user_id, asignamos un valor por defecto
+        if "user_id" not in doc:
+            doc["user_id"] = ""          # o "anonymous", o None si haces Optional
+
+        recipes.append(Recipe(**doc))
+    return recipes
+
+
+@app.get("/graphql/get_recipebyuser", response_model=List[Recipe])
+async def get_recipes_by_user(request: Request):
+    # 1) Extraer user_id del header (x-user-id o Authorization)
+    try:
+        # Creamos un “pseudo-info” para reusar tu helper
+        info = type("Info", (), {"context": {"request": request}})
+        user_id = get_current_user_id(info)
+    except HTTPException as e:
+        # Si no viene auth o es inválida, devolvemos 401
+        raise e
+
+    # 2) Consultar Mongo
+    coll = get_collection("recipes")
+    raw_docs = await coll.find({"user_id": user_id}).to_list(100)
+
+    # 3) Mapear ObjectId y generar instancias de Recipe
+    recipes: List[Recipe] = []
+    for doc in raw_docs:
+        doc["id"] = str(doc.pop("_id"))
+        recipes.append(Recipe(**doc))
+
+    return recipes
+
+@app.post("/graphql/create_recipe", response_model=Recipe)
+async def create_recipe(request: Request, payload: dict = Body(...)):
+    # 1) Autenticación / extracción de user_id
+    try:
+        info = type("Info", (), {"context": {"request": request}})
+        user_id = get_current_user_id(info)
+        print("Encontramos user_id:", user_id)
+    except HTTPException as e:
+        raise e
+
+    # 2) Leer campos obligatorios y opcionales
+    title     = payload.get("title")
+    prep_time = payload.get("prep_time")
+    portions  = payload.get("portions")
+    steps     = payload.get("steps")
+    images    = payload.get("images", None)
+    video     = payload.get("video", None)
+    
+
+    # (Opcional: validar que title, prep_time, portions y steps no sean None)
+
+    # 3) Insertar en Mongo
+    doc = {
+        "user_id":   user_id,
+        "title":     title,
+        "prep_time": prep_time,
+        "portions":  portions,
+        "steps":     steps,
+        "images":    images,
+        "video":     video,
+    }
+
+    print("Receta a insertar:", doc)
+
+    coll = get_collection("recipes")
+
+    print("Colección de recetas:", coll)
+
+    res = await coll.insert_one(doc)
+
+    print("Insertado:", res.inserted_id)
+
+    # 4) Leer de vuelta y mapear _id → id
+    saved = await coll.find_one({"_id": res.inserted_id})
+    saved["id"] = str(saved.pop("_id"))
+    return Recipe(**saved)

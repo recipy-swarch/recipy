@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import "./login.css";
 import loginHero from '../components/login-hero.jpg';
 import { useRouter } from "next/navigation";
+import { loginUser } from "@/lib/userActions";  // Nuevo import
 
 export default function LoginPage() {
     const [username, setUsername] = useState("");
@@ -14,22 +15,15 @@ export default function LoginPage() {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
-        try {
-            const res = await fetch("http://localhost:5000/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, password }),
-            });
-            const data = await res.json();
-            if (res.ok && data.token) {
-                localStorage.setItem("token", data.token);
-                // Redirige o muestra éxito aquí si quieres
-                router.push("/"); // Redirige a la raíz
-            } else {
-                setError(data.error || "Error al iniciar sesión");
+        const result = await loginUser({ username, password });
+        if (result.success) {
+            if (result.token) {
+                router.push("/");  // Ajusta la ruta de destino según tu flujo
+                localStorage.setItem("token",result.token);
             }
-        } catch (err) {
-            setError("Error de red o servidor");
+            
+        } else {
+            setError(result.error as string || "Error de inicio de sesión");
         }
     };
 

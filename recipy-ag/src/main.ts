@@ -32,7 +32,7 @@ async function bootstrap() {
     createProxyMiddleware({
       target: process.env.USERAUTH_MS_URL,
       changeOrigin: true,
-      pathRewrite: { '^/auth': '' }, // quita el prefijo /auth
+      pathRewrite: { '^/auth': '' , }, // quita el prefijo /auth
     }),
   );
 

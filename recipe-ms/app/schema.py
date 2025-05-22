@@ -9,29 +9,19 @@ from fastapi import HTTPException
 # ————————————————
 # Helper de Auth
 # ————————————————
+from fastapi import HTTPException
+
 def get_current_user_id(info) -> str:
     req = info.context["request"]
-    auth = req.headers.get("authorization") or req.headers.get("x-user-id")
-    if not auth:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    # si vino x-user-id, lo devolvemos tal cual:
-    if not auth.lower().startswith("bearer"):
-        return auth  # asume que es un user_id directo
-    # si vino Bearer token, lo validamos:
-    token = auth.split()[1]
-    try:
-        payload = jwt.decode(
-          token,
-          os.getenv("JWT_SECRET", "change-me"),
-          algorithms=[os.getenv("JWT_ALGO", "HS256")],
-          options={
-            "require_sub": True,
-            "verify_aud": False   # ← DESACTIVAR la verificación de "aud"
-          }
-        )
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return str(payload["sub"])
+    # Primero miro Authorization
+    auth = req.headers.get("authorization")
+    if auth:
+        # si viene sin Bearer, asumo que es directamente el user_id
+        if not auth.lower().startswith("bearer"):
+            return auth
+        # o parseas tu Bearer token aquí…
+    raise HTTPException(status_code=401, detail="Authentication required")
+
 
 # -------------------------
 # Tipos de dominio
@@ -46,6 +36,9 @@ class Recipe:
     video: Optional[str] = None
     portions: int
     steps: List[str]
+    user_id: str 
+
+
 
 @strawberry.input
 class RecipeInput:
@@ -55,6 +48,8 @@ class RecipeInput:
     video: Optional[List[str]] = None
     portions: int
     steps: List[str]
+    user_id: str 
+
 
 @strawberry.type
 class Comment:
@@ -85,10 +80,13 @@ class Query:
         raw_docs = await coll.find({}).to_list(100)
         recipes: List[Recipe] = []
         for doc in raw_docs:
-            # Mapear _id -> id y eliminar el campo interno
             doc["id"] = str(doc.pop("_id"))
+            # Asegurarse de que tenga user_id, aunque sea None
+            if "user_id" not in doc:
+                doc["user_id"] = "unknown"  # o None, o un valor por defecto
             recipes.append(Recipe(**doc))
         return recipes
+
 
     @strawberry.field
     async def recipe(self, id: str) -> Optional[Recipe]:
@@ -130,6 +128,16 @@ class Query:
             doc["id"] = str(doc.pop("_id"))
             likes.append(Like(**doc))
         return likes
+
+    @strawberry.field
+    async def recipes_by_user(self, user_id: str) -> List[Recipe]:
+        coll = get_collection("recipes")
+        raw_docs = await coll.find({"user_id": user_id}).to_list(100)
+        recipes: List[Recipe] = []
+        for doc in raw_docs:
+            doc["id"] = str(doc.pop("_id"))
+            recipes.append(Recipe(**doc))
+        return recipes
 
 # -------------------------
 # Resolutores de mutación

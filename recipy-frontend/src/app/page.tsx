@@ -4,7 +4,7 @@ import styles from "./page.module.css";
 import Link from "next/link";
         
 export default async function RecipesPage() {
-    const recipes = await recipeService.fetchRecipes()
+    const recipes = await recipeService.fetchUserRecipes()
 
     return (
         <div className="container mt-4">

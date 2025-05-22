@@ -2,6 +2,7 @@
 import os
 import datetime
 import jwt
+from Flask import jwt_flask
 from passlib.context import CryptContext
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -17,7 +18,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_token(sub: int) -> str:
     payload = {
-        "sub": sub,
+        "sub": str(sub),            # ← obligamos a que sea string
         "role": "authenticator", # <-- rol de autenticados que definimos en PostgREST
         "aud":  "postgrest",  # <<< coincide con jwt-aud en postgrest.conf
         "exp":  datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXP_HRS)

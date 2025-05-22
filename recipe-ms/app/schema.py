@@ -3,6 +3,35 @@ from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
 from app.db import get_collection
+import os, jwt
+from fastapi import HTTPException
+
+# ————————————————
+# Helper de Auth
+# ————————————————
+def get_current_user_id(info) -> str:
+    req = info.context["request"]
+    auth = req.headers.get("authorization") or req.headers.get("x-user-id")
+    if not auth:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    # si vino x-user-id, lo devolvemos tal cual:
+    if not auth.lower().startswith("bearer"):
+        return auth  # asume que es un user_id directo
+    # si vino Bearer token, lo validamos:
+    token = auth.split()[1]
+    try:
+        payload = jwt.decode(
+          token,
+          os.getenv("JWT_SECRET", "change-me"),
+          algorithms=[os.getenv("JWT_ALGO", "HS256")],
+          options={
+            "require_sub": True,
+            "verify_aud": False   # ← DESACTIVAR la verificación de "aud"
+          }
+        )
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return str(payload["sub"])
 
 # -------------------------
 # Tipos de dominio
@@ -110,7 +139,8 @@ class Query:
 class Mutation:
 
     @strawberry.mutation
-    async def add_recipe(self, recipe: RecipeInput) -> Recipe:
+    async def add_recipe(self, info, recipe: RecipeInput) -> Recipe:
+        user_id = get_current_user_id(info)
         coll = get_collection("recipes")
         # Insertar
         res = await coll.insert_one(recipe.__dict__)
@@ -121,7 +151,8 @@ class Mutation:
         return Recipe(**doc)
 
     @strawberry.mutation
-    async def update_recipe(self, id: str, recipe: RecipeInput) -> Optional[Recipe]:
+    async def update_recipe(self, info, id: str, recipe: RecipeInput) -> Optional[Recipe]:
+        user_id = get_current_user_id(info)
         coll = get_collection("recipes")
         await coll.update_one({"_id": ObjectId(id)}, {"$set": recipe.__dict__})
         doc = await coll.find_one({"_id": ObjectId(id)})
@@ -131,7 +162,8 @@ class Mutation:
         return Recipe(**doc)
 
     @strawberry.mutation
-    async def delete_recipe(self, id: str) -> bool:
+    async def delete_recipe(self, info, id: str) -> bool:
+        user_id = get_current_user_id(info)
         coll = get_collection("recipes")
         res = await coll.delete_one({"_id": ObjectId(id)})
         return res.deleted_count == 1
@@ -139,11 +171,12 @@ class Mutation:
     @strawberry.mutation
     async def add_comment(
         self,
+        info,
         recipe_id: str,
-        user_id: str,
         content: str,
         parent_id: Optional[str] = None
     ) -> Comment:
+        user_id = get_current_user_id(info)
         coll = get_collection("comments")
         # Insertar
         res = await coll.insert_one({
@@ -162,7 +195,8 @@ class Mutation:
 
 
     @strawberry.mutation
-    async def like_recipe(self, recipe_id: str, user_id: str) -> Like:
+    async def like_recipe(self, info, recipe_id: str) -> Like:
+        user_id = get_current_user_id(info)
         coll = get_collection("likes")
         # Insertar el like
         res = await coll.insert_one({

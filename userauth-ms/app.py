@@ -43,12 +43,12 @@ def pg(path, **kw):
 def register():
     data = request.json or {}
 
-    # Validación básica de campos
+    # 1. Validación básica de campos obligatorios
     for field in ("name", "email", "username", "password"):
         if not data.get(field):
             return jsonify({"error": f"Falta campo {field}"}), 400
 
-    # Preparamos el payload para el RPC
+    # 2. Preparamos el payload para el RPC de PostgREST
     payload = {
         "_name":     data["name"],
         "_email":    data["email"],
@@ -56,7 +56,7 @@ def register():
         "_password": data["password"],
     }
 
-    # Llamada al RPC register_user
+    # 3. Llamada al RPC register_user
     r = pg(
         "rpc/register_user",
         method="POST",
@@ -64,13 +64,24 @@ def register():
         json=payload
     )
 
-    # PostgREST devuelve 204 No Content al ser función VOID
+    # 4. Si todo va bien (200 OK o 204 No Content), devolvemos 201 Created
     if r.status_code in (200, 204):
         return jsonify({"message": "User registered"}), 201
 
-    # Reenviamos el error de PostgREST
-    return abort(r.status_code, r.text)
+    # 5. Manejo de claves duplicadas (username o email ya existe)
+    if r.status_code in (409, 422):
+        # PostgREST suele devolver un JSON con detalles o texto plano
+        if r.headers.get("Content-Type", "").startswith("application/json"):
+            detail = r.json().get("message", r.text)
+        else:
+            detail = r.text
+        return jsonify({
+            "error": "Username o email ya registrado",
+            "detail": detail
+        }), 409
 
+    # 6. Para cualquier otro error, reenviamos el código y el mensaje original
+    return abort(r.status_code, r.text)
 
 
 @app.route("/login", methods=["POST"])

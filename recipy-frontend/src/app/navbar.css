@@ -1,0 +1,31 @@
+.navbar {
+    background-color: var(--nav-fot);
+
+    .navbar-brand {
+        color: var(--text);
+    }
+}
+
+.navbar .nav-link {
+    /* background-color: var(--main-button);
+    color: var(--main-button-text);
+    border-radius: 8px; */
+
+}
+
+.footer {
+    background-color: var(--nav-fot);
+
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    color: var(--text);
+
+    .nav-link {
+        color: var(--main-button);
+    }
+}
+
+.nav-pills {
+    gap: 1rem;
+}

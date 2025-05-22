@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as bodyParser from 'body-parser';
+import axios from 'axios';                      // <-- nuevo
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -50,22 +51,62 @@ async function bootstrap() {
     },
   });
 
-  // 2. Proxy específico para GraphQL de recetas
+  // 2. Middleware que llama a /me y guarda el id
+  const addUserIdHeader = async (req: any, _res: any, next: any) => {
+    try {
+      const auth = req.headers['authorization'];
+      const { data } = await axios.get(
+        `${process.env.USERAUTH_MS_URL}/me`,
+        { headers: { authorization: auth } }
+      );
+      req.userId = data.id;
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // 3.1. Middleware que sube imágenes a Imgur y reemplaza el array en el body
+  const processImages = async (req: any, _res: any, next: any) => {
+    try {
+      if (req.body?.images && Array.isArray(req.body.images)) {
+        const links = await Promise.all(
+          req.body.images.map(async (img: string) => {
+            const { data } = await axios.post(
+              `${process.env.IMGUR_API_URL}/imgur/upload`,
+              { image: img }
+            );
+            return data.data.link;
+          })
+        );
+        req.body.images = links;
+        req.rawBody = JSON.stringify(req.body);
+      }
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // 3. Proxy específico para GraphQL de recetas
   app.use(
     '/recipe/graphql',
-    //  a) parseamos raw JSON (sin convertir a req.body JS)
-    jsonParser,
-    //  b) luego reenviamos ese rawBody al microservicio de recetas
+    addUserIdHeader,  // <-- primero obtenemos el id
+    jsonParser,       // <-- luego el raw body
+    processImages,    // <-- subimos imágenes y actualizamos req.rawBody
     createProxyMiddleware({
       target: process.env.RECIPE_MS_URL,
       changeOrigin: true,
-      pathRewrite: { '^/recipe': '' }, // quita el prefijo /recipe
+      //pathRewrite: { '^/recipe': '' }, // quita el prefijo /recipe
       onProxyReq(proxyReq, req: any) {
         if (req.rawBody) {
           // reescribimos el body tal cual lo recibimos
           proxyReq.setHeader('Content-Type', 'application/json');
           proxyReq.setHeader('Content-Length', Buffer.byteLength(req.rawBody));
           proxyReq.write(req.rawBody);
+        }
+        if (req.userId) {
+          proxyReq.setHeader('id', req.userId); // <-- inyectamos el id
         }
       },
     }),

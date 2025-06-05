@@ -1,8 +1,7 @@
-// filepath: /home/juan-david/Recipy/imgur/app/imgur-api/Controllers/ImgurController.cs
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Mvc;
 
-namespace imgur_api.Controllers;
+namespace imgur_ms.Controllers;
 
 [ApiController]
 [Route("[controller]")]
@@ -18,8 +17,9 @@ public class ImgurController : ControllerBase
     }
 
     [HttpPost("upload")]
+    [Consumes("multipart/form-data")]
     public async Task<IActionResult> Upload(
-        [FromForm] IFormFile image,
+       IFormFile image,
         [FromForm] string? title,
         [FromForm] string? description)
     {

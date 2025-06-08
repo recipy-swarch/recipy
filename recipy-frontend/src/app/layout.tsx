@@ -1,9 +1,10 @@
+// app/layout.tsx o donde tengas tu layout principal
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import  "bootstrap/dist/css/bootstrap.min.css"
+import "bootstrap/dist/css/bootstrap.min.css";
 import "./globals.css";
 import "./navbar.css";
-
+import ClientLayout from "@/components/clientLayout"; // Asegúrate de que la ruta es correcta
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Recipy",
-  description: "Red soial para compartir recetas de cocina",
+  description: "Red social para compartir recetas de cocina",
   icons: {
     icon: "/favicon.ico",
   },
@@ -32,42 +33,32 @@ export default function RootLayout({
     <html lang="es">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <nav className="navbar bg-body-transparent px-3">
-          <a className="navbar-brand" href="/#">
-            Navbar
-          </a>
+          <a className="navbar-brand" href="/#">Navbar</a>
           <ul className="nav nav-pills">
             <li className="nav-item">
               <button className="btn">
-                <a className="nav-link" href="/login">
-                  first
-                </a>
+                <a className="nav-link" href="/create-recipe">create recipe</a>
               </button>
             </li>
             <li className="nav-item">
               <button className="btn">
-                <a className="nav-link" href="/login">
-                  second
-                </a>
+                <a className="nav-link" href="/login">second</a>
               </button>
             </li>
             <li className="nav-item">
               <button className="btn">
-                <a className="nav-link" href="/login">
-                  login
-                </a>
+                <a className="nav-link" href="/login">login</a>
               </button>
             </li>
             <li className="nav-item">
               <button className="btn special-btn">
-                <a className="nav-link" href="/register">
-                  Register
-                </a>
+                <a className="nav-link" href="/register">Register</a>
               </button>
             </li>
           </ul>
         </nav>
 
-        <main className="container-fluid">{children}</main>
+        <ClientLayout>{children}</ClientLayout>
 
         <div className="container-fluid footer">
           <footer className="p-5">

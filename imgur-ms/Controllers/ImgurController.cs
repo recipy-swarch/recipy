@@ -1,5 +1,6 @@
-using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Mvc;
+using System.IO;
+using System.Net.Mime;
 
 namespace imgur_ms.Controllers;
 
@@ -7,41 +8,57 @@ namespace imgur_ms.Controllers;
 [Route("[controller]")]
 public class ImgurController : ControllerBase
 {
-    private readonly IHttpClientFactory _httpFactory;
-    private readonly string _clientId;
+    private readonly IWebHostEnvironment _env;
 
-    public ImgurController(IHttpClientFactory httpFactory, IConfiguration config)
+    public ImgurController(IWebHostEnvironment env)
     {
-        _httpFactory = httpFactory;
-        _clientId = config["Imgur:ClientId"]!;
+        _env = env;
     }
 
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> Upload(
-       IFormFile image,
-        [FromForm] string? title,
-        [FromForm] string? description)
+        IFormFile image,
+        [FromForm] string type,
+        [FromForm] string id)
     {
         if (image is null || image.Length == 0)
-            return BadRequest("No se envió ninguna imagen.");
+            return BadRequest("No image uploaded.");
+        if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(id))
+            return BadRequest("Missing type or id.");
 
-        using var content = new MultipartFormDataContent();
-        var stream = new StreamContent(image.OpenReadStream());
-        stream.Headers.ContentType = MediaTypeHeaderValue.Parse(image.ContentType);
-        content.Add(stream, "image", image.FileName);
-        content.Add(new StringContent("file"), "type");
-        if (!string.IsNullOrEmpty(title))
-            content.Add(new StringContent(title), "title");
-        if (!string.IsNullOrEmpty(description))
-            content.Add(new StringContent(description), "description");
+        var uploadsRoot = Path.Combine(_env.WebRootPath ?? "wwwroot", "uploads", type, id);
+        Directory.CreateDirectory(uploadsRoot);
 
-        var client = _httpFactory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Client-ID", _clientId);
+        var filePath = Path.Combine(uploadsRoot, image.FileName);
 
-        var resp = await client.PostAsync("https://api.imgur.com/3/image", content);
-        var json = await resp.Content.ReadAsStringAsync();
-        return StatusCode((int)resp.StatusCode, json);
+        using var stream = new FileStream(filePath, FileMode.Create);
+        await image.CopyToAsync(stream);
+
+        var url = $"{Request.Scheme}://{Request.Host}/uploads/{type}/{id}/{image.FileName}";
+        return Ok(new { url });
+    }
+
+    [HttpGet("{type}/{id}/{filename}")]
+    public IActionResult GetImage(string type, string id, string filename)
+    {
+        var filePath = Path.Combine(_env.WebRootPath ?? "wwwroot", "uploads", type, id, filename);
+        if (!System.IO.File.Exists(filePath))
+            return NotFound("Image not found.");
+
+        var contentType = GetContentType(filePath);
+        return PhysicalFile(filePath, contentType);
+    }
+
+    private static string GetContentType(string path)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext switch
+        {
+            ".jpg" or ".jpeg" => MediaTypeNames.Image.Jpeg,
+            ".png" => "image/png",
+            ".gif" => MediaTypeNames.Image.Gif,
+            _ => MediaTypeNames.Application.Octet
+        };
     }
 }

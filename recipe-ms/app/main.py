@@ -8,12 +8,14 @@ from app.schema import Query, Mutation
 from app.db import client, get_collection
 from app.initial_data import get_initial_recipes
 from app.data import load_initial_data  # función que pobla la lista en memoria
-from fastapi import FastAPI, Request, HTTPException, Body
+from fastapi import FastAPI, Request, HTTPException, Body, status
 from typing import List
 from app.db import get_collection
 from app.schema import Recipe  # tu dataclass Strawberry
 from app.schema import get_current_user_id  # tu helper
 from datetime import datetime
+from bson import ObjectId
+
 # 1. Definir el esquema
 schema = strawberry.Schema(query=Query, mutation=Mutation)
 
@@ -143,3 +145,106 @@ async def create_recipe(request: Request, payload: dict = Body(...)):
     saved = await coll.find_one({"_id": res.inserted_id})
     saved["id"] = str(saved.pop("_id"))
     return Recipe(**saved)
+
+@app.delete(
+    "/graphql/delete_recipebyuser",
+    response_model=List[Recipe],
+    responses={
+        400: {"description": "Bad Request: recipe_id inválido o ausente"},
+        401: {"description": "Unauthorized"},
+        404: {"description": "Not Found: no existe o no te pertenece"}
+    },
+    status_code=status.HTTP_200_OK
+)
+async def delete_recipe_by_user(request: Request):
+    # 1) Extraer user_id
+    try:
+        info = type("Info", (), {"context": {"request": request}})
+        user_id = get_current_user_id(info)
+    except HTTPException as e:
+        raise e
+
+    # 2) Leer recipe_id
+    recipe_id = request.query_params.get("recipe_id")
+    if not recipe_id:
+        raise HTTPException(400, detail="Falta el parámetro `recipe_id`")
+
+    # 3) Validar ObjectId
+    try:
+        oid = ObjectId(recipe_id)
+    except Exception:
+        raise HTTPException(400, detail="`recipe_id` no es un ID válido")
+
+    coll = get_collection("recipes")
+
+    # 4) Borrar condicional por user_id
+    res = await coll.delete_one({"_id": oid, "user_id": user_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, detail="Receta no encontrada o no te pertenece")
+
+    # 5) Devolver las recetas restantes de ese usuario
+    docs = await coll.find({"user_id": user_id}).to_list(100)
+    remaining: List[Recipe] = []
+    for doc in docs:
+        doc["id"] = str(doc.pop("_id"))
+        remaining.append(Recipe(**doc))
+
+    return remaining
+
+
+@app.put(
+    "/graphql/update_recipebyuser",
+    response_model=Recipe,
+    responses={
+        400: {"description": "Bad Request: recipe_id inválido o body vacío"},
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden: no eres el autor"},
+        404: {"description": "Not Found: receta no existe"}
+    },
+    status_code=status.HTTP_200_OK
+)
+async def update_recipe_by_user(request: Request):
+    # 1) Autenticación
+    try:
+        info = type("Info", (), {"context": {"request": request}})
+        user_id = get_current_user_id(info)
+    except HTTPException as e:
+        raise e
+
+    # 2) Leer recipe_id de query
+    recipe_id = request.query_params.get("recipe_id")
+    if not recipe_id:
+        raise HTTPException(400, detail="Falta el parámetro `recipe_id`")
+    try:
+        oid = ObjectId(recipe_id)
+    except Exception:
+        raise HTTPException(400, detail="`recipe_id` no es un ID válido")
+
+    # 3) Leer payload JSON
+    body = await request.json()
+    # filtrar solo campos válidos
+    allowed = {"title", "prep_time", "portions", "steps", "images", "video"}
+    update_data = {k: v for k, v in body.items() if k in allowed}
+    if not update_data:
+        raise HTTPException(400, detail="No hay campos válidos para actualizar")
+
+    coll = get_collection("recipes")
+
+    # 4) Verificar existencia y autoría
+    doc = await coll.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(404, detail="Receta no existe")
+    if str(doc.get("user_id", "")) != user_id:
+        raise HTTPException(403, detail="No puedes editar esta receta")
+
+    # 5) Aplicar update
+    await coll.update_one({"_id": oid}, {"$set": update_data})
+
+    # 6) Leer y devolver actualizado
+    updated = await coll.find_one({"_id": oid})
+    updated["id"] = str(updated.pop("_id"))
+    # asegúrate de que user_id siga en el dict
+    if "user_id" not in updated:
+        updated["user_id"] = user_id
+    return Recipe(**updated)
+

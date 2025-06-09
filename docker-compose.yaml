@@ -119,6 +119,37 @@ services:
     networks:
       - backend
 
+  # Servicio de correo asíncrono
+  mail-ms:
+    build:
+      context: ./mail-ms
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env      # Carga MAIL_SMTP_* y AMQP_URL
+    depends_on:
+      - mail-broker
+    networks:
+      - backend
+    restart: always
+
+  # Broker de mensajes (RabbitMQ)
+  mail-broker:
+    image: rabbitmq:3-management
+    container_name: mail-broker
+    restart: always
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - backend
+
+volumes:
+  rabbitmq_data:
+
 networks:
   frontend:
   backend:

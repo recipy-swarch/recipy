@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using System.IO;
 using System.Net.Mime;
 
@@ -9,10 +10,12 @@ namespace image_ms.Controllers;
 public class ImageController : ControllerBase
 {
     private readonly IWebHostEnvironment _env;
+    private readonly string _apiGatewayUrl;
 
-    public ImageController(IWebHostEnvironment env)
+    public ImageController(IWebHostEnvironment env, IConfiguration config)
     {
         _env = env;
+        _apiGatewayUrl = config["Image:API_GATEWAY_URL"];
     }
 
     /// <summary>
@@ -34,11 +37,10 @@ public class ImageController : ControllerBase
         Directory.CreateDirectory(uploadsRoot);
 
         var filePath = Path.Combine(uploadsRoot, image.FileName);
-
         using var stream = new FileStream(filePath, FileMode.Create);
         await image.CopyToAsync(stream);
 
-        var url = $"{Request.Scheme}://{Request.Host}/uploads/{type}/{id}/{image.FileName}";
+        var url = $"{_apiGatewayUrl}/uploads/{type}/{id}/{image.FileName}";
         return Ok(new { url });
     }
 
@@ -71,7 +73,7 @@ public class ImageController : ControllerBase
             .Select(fn =>
             {
                 var name = Path.GetFileName(fn);
-                var url = $"{Request.Scheme}://{Request.Host}/uploads/{type}/{id}/{name}";
+                var url = $"{_apiGatewayUrl}/uploads/{type}/{id}/{name}";
                 return new { name, url };
             })
             .ToArray();

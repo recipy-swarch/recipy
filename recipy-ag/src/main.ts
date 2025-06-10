@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as bodyParser from 'body-parser';
 import axios from 'axios';                      // <-- nuevo
+import FormData from 'form-data'
 
 
 async function bootstrap() {
@@ -82,9 +83,16 @@ async function bootstrap() {
         console.log('Uploading images to Imgur:', req.body.images);
         const links = await Promise.all(
           req.body.images.map(async (img: string) => {
+            const form = new FormData()
+            const buffer = Buffer.from(img, 'base64')
+            form.append('image', buffer, { filename: 'upload.png' })
+            form.append('type', 'recipe')
+            form.append('id', req.userId ?? '0')
+
             const { data } = await axios.post(
-              `${process.env.IMGUR_API_URL}/imgur/upload`,
-              { image: img }
+              `${process.env.IMGUR_API_URL}/Imgur/upload`,
+              form,
+              { headers: form.getHeaders() }
             );
             console.log('Imgur response:', data);
             return data.data.link;

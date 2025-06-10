@@ -11,7 +11,7 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo 
     { 
-        Title = "imgur-ms API", 
+        Title = "image-ms API", 
         Version = "v1" 
     });
 });
@@ -20,11 +20,14 @@ builder.Services.AddHttpClient();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
    {
-       c.SwaggerEndpoint("/swagger/v1/swagger.json", "imgur-ms v1");
+       c.SwaggerEndpoint("/swagger/v1/swagger.json", "image-ms v1");
    });
+}
 
 app.UseHttpsRedirection();
 

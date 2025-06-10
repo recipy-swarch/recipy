@@ -15,20 +15,20 @@ EXPOSE 8081
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["imgur-ms.csproj", "."]
-RUN dotnet restore "./imgur-ms.csproj"
+COPY ["image-ms.csproj", "."]
+RUN dotnet restore "./image-ms.csproj"
 COPY . .
 WORKDIR "/src/."
-RUN dotnet build "./imgur-ms.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet build "./image-ms.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./imgur-ms.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./image-ms.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-VOLUME ["/app/wwwroot"]
+VOLUME ["/app/wwwroot/uploads"]
 
-ENTRYPOINT ["dotnet", "imgur-ms.dll"]
+ENTRYPOINT ["dotnet", "image-ms.dll"]

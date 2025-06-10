@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 using System.Net.Mime;
+using System.Security.Cryptography;    // ← añadir
+using System;                         // ← para Convert
 
 namespace image_ms.Controllers;
 
@@ -41,7 +43,13 @@ public class ImageController : ControllerBase
         await image.CopyToAsync(stream);
 
         var url = $"{_apiGatewayUrl}/uploads/{type}/{id}/{image.FileName}";
-        return Ok(new { url });
+
+        // Calcular SHA-256
+        using var sha = SHA256.Create();
+        using var fsHash = System.IO.File.OpenRead(filePath);
+        var hash = Convert.ToBase64String(sha.ComputeHash(fsHash));
+
+        return Ok(new { url, hash });
     }
 
     /// <summary>
@@ -53,6 +61,12 @@ public class ImageController : ControllerBase
         var filePath = Path.Combine(_env.WebRootPath ?? "wwwroot", "uploads", type, id, filename);
         if (!System.IO.File.Exists(filePath))
             return NotFound("Image not found.");
+
+        // Calcular SHA-256
+        using var sha = SHA256.Create();
+        using var fsHash = System.IO.File.OpenRead(filePath);
+        var hash = Convert.ToBase64String(sha.ComputeHash(fsHash));
+        Response.Headers.Add("X-Content-Sha256", hash); // Este se añade al header de la respuesta
 
         var contentType = GetContentType(filePath);
         return PhysicalFile(filePath, contentType);
@@ -74,7 +88,13 @@ public class ImageController : ControllerBase
             {
                 var name = Path.GetFileName(fn);
                 var url = $"{_apiGatewayUrl}/uploads/{type}/{id}/{name}";
-                return new { name, url };
+
+                // Calcular SHA-256
+                using var sha = SHA256.Create();
+                using var fsHash = System.IO.File.OpenRead(fn);
+                var hash = Convert.ToBase64String(sha.ComputeHash(fsHash));
+
+                return new { name, url, hash };
             })
             .ToArray();
 

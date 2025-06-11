@@ -177,7 +177,7 @@ export default function RecipeForm() {
       </div>
 
       <div className="mb-3 text-end">
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+        <button type="submit" className="btn" disabled={isSubmitting}>
           {isSubmitting ? "Creando..." : "Crear Receta"}
         </button>
       </div>

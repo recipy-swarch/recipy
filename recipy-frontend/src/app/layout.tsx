@@ -42,7 +42,7 @@ export default function RootLayout({
             </li>
             <li className="nav-item">
               <button className="btn">
-                <a className="nav-link" href="/login">second</a>
+                <a className="nav-link" href="/profile">My profile</a>
               </button>
             </li>
             <li className="nav-item">

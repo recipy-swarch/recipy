@@ -2,39 +2,27 @@ export default function ProfilePage() {
   return (
     <div className="container py-5 h-100">
       <div className="row d-flex justify-content-center">
-        <div className="col col-lg-9 col-xl-8">
+        <div className="col col-lg-11 col-xl-11">
           <div className="card">
-            <div
-              className="rounded-top text-white d-flex flex-row"
-              style={{ backgroundColor: "#000", height: "200px" }}
-            >
+            <div className="p-4 d-flex justify-content-between">
               <div
-                className="ms-4 mt-5 d-flex flex-column"
-                style={{ width: "150px" }}
+                className="d-flex flex-column"
               >
-                <img
-                  src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-profiles/avatar-1.webp"
-                  alt="Generic placeholder image"
-                  className="img-fluid img-thumbnail mt-4 mb-2"
-                  style={{ width: "150px", zIndex: 1 }}
-                />
+                <div className="user">
+                  <h5>Andy Hsssssssssssssssssorwitz</h5>
+                  <p>New York</p>
+              </div>
                 <button
                   type="button"
                   data-mdb-button-init
                   data-mdb-ripple-init
-                  className="btn btn-outline-dark text-body"
+                  className="btn w-auto align-self-start"
                   data-mdb-ripple-color="dark"
                   style={{ zIndex: 1 }}
                 >
                   Edit profile
                 </button>
               </div>
-              <div className="ms-3" style={{ marginTop: "130px" }}>
-                <h5>Andy Horwitz</h5>
-                <p>New York</p>
-              </div>
-            </div>
-            <div className="p-4 text-black bg-body-tertiary">
               <div className="d-flex justify-content-end text-center py-1 text-body">
                 <div>
                   <p className="mb-1 h5">253</p>

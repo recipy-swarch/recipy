@@ -3,9 +3,7 @@ import { AppModule } from './app.module';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as bodyParser from 'body-parser';
 import axios from 'axios';                      // <-- nuevo
-import FormData from 'form-data'
-
-
+import * as FormData from 'form-data';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -77,37 +75,39 @@ async function bootstrap() {
   };
 
   // 3.1. Middleware que sube imágenes a Imgur y reemplaza el array en el body
-  const processImages = async (req: any, _res: any, next: any) => {
-    try {
-      if (req.body?.images && Array.isArray(req.body.images)) {
-        console.log('Uploading images to Imgur:', req.body.images);
-        const links = await Promise.all(
-          req.body.images.map(async (img: string) => {
-            const form = new FormData()
-            const buffer = Buffer.from(img, 'base64')
-            form.append('image', buffer, { filename: 'upload.png' })
-            form.append('type', 'recipe')
-            form.append('id', req.userId ?? '0')
+ const processImages = async (req: any, _res: any, next: any) => {
+   try {
+     if (req.body?.images && Array.isArray(req.body.images)) {
+       console.log('Uploading images to Imgur:', req.body.images);
+       const links = await Promise.all(
+         req.body.images.map(async (img: string) => {
+           const form = new FormData()
+           const buffer = Buffer.from(img, 'base64')
+           form.append('image', buffer, { filename: 'upload.png' })
+           form.append('type', 'recipe')
+           form.append('id', req.userId ?? '0')
 
-            const { data } = await axios.post(
-              `${process.env.IMGUR_API_URL}/Imgur/upload`,
-              form,
-              { headers: form.getHeaders() }
-            );
-            console.log('Imgur response:', data);
-            return data.data.link;
-          })
-        );
-        req.body.images = links;
-        console.log('Updated images in body:', req.body.images);
-        req.rawBody = JSON.stringify(req.body);
-        console.log('Updated raw body:', req.rawBody);
-      }
-      next();
-    } catch (err) {
-      next(err);
-    }
-  };
+
+           const { data } = await axios.post(
+             `${process.env.IMGUR_API_URL}/Imgur/upload`,
+             form,
+             { headers: form.getHeaders() }
+           );
+           console.log('Imgur response:', data);
+           return data.data.link;
+         })
+       );
+       req.body.images = links;
+       console.log('Updated images in body:', req.body.images);
+       req.rawBody = JSON.stringify(req.body);
+       console.log('Updated raw body:', req.rawBody);
+     }
+     next();
+   } catch (err) {
+     next(err);
+   }
+ };
+
 
   // 3. Proxy específico para GraphQL de recetas
   app.use(

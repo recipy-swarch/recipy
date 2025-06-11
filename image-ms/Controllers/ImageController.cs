@@ -38,17 +38,23 @@ public class ImageController : ControllerBase
         var uploadsRoot = Path.Combine(_env.WebRootPath ?? "wwwroot", "uploads", type, id);
         Directory.CreateDirectory(uploadsRoot);
 
-        var filePath = Path.Combine(uploadsRoot, image.FileName);
-        using var stream = new FileStream(filePath, FileMode.Create);
-        await image.CopyToAsync(stream);
+        // Leemos todo el contenido en memoria para calcular el hash
+        await using var ms = new MemoryStream();
+        await image.CopyToAsync(ms);
+        var bytes = ms.ToArray();
 
-        var link = $"{_apiGatewayUrl}/uploads/{type}/{id}/{image.FileName}";
-
-        // Calcular SHA-256
+        // Calculamos SHA-256 y lo usamos como nombre de archivo
         using var sha = SHA256.Create();
-        using var fsHash = System.IO.File.OpenRead(filePath);
-        var hash = Convert.ToBase64String(sha.ComputeHash(fsHash));
+        var hashBytes = sha.ComputeHash(bytes);
+        var hash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+        var ext = Path.GetExtension(image.FileName).ToLowerInvariant();
+        var fileName = $"{hash}{ext}";
 
+        // Guardamos el fichero con el nombre basado en el hash
+        var filePath = Path.Combine(uploadsRoot, fileName);
+        await System.IO.File.WriteAllBytesAsync(filePath, bytes);
+
+        var link = $"{_apiGatewayUrl}/uploads/{type}/{id}/{fileName}";
         return Ok(new { link, hash });
     }
 
@@ -65,7 +71,7 @@ public class ImageController : ControllerBase
         // Calcular SHA-256
         using var sha = SHA256.Create();
         using var fsHash = System.IO.File.OpenRead(filePath);
-        var hash = Convert.ToBase64String(sha.ComputeHash(fsHash));
+        var hash = Convert.ToString(sha.ComputeHash(fsHash)).Replace("-", "").ToLowerInvariant();
         Response.Headers.Add("X-Content-Sha256", hash); // Este se añade al header de la respuesta
 
         var contentType = GetContentType(filePath);
@@ -92,7 +98,7 @@ public class ImageController : ControllerBase
                 // Calcular SHA-256
                 using var sha = SHA256.Create();
                 using var fsHash = System.IO.File.OpenRead(fn);
-                var hash = Convert.ToBase64String(sha.ComputeHash(fsHash));
+                var hash = Convert.ToString(sha.ComputeHash(fsHash)).Replace("-", "").ToLowerInvariant();
 
                 return new { name, link, hash };
             })

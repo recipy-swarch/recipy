@@ -54,5 +54,4 @@ TestResult.xml
 nunit-*.xml
 
 # Ignore the uploads
-uploads/
-!uploads/.gitkeep
+uploads/*/**

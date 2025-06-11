@@ -42,14 +42,14 @@ public class ImageController : ControllerBase
         using var stream = new FileStream(filePath, FileMode.Create);
         await image.CopyToAsync(stream);
 
-        var url = $"{_apiGatewayUrl}/uploads/{type}/{id}/{image.FileName}";
+        var link = $"{_apiGatewayUrl}/uploads/{type}/{id}/{image.FileName}";
 
         // Calcular SHA-256
         using var sha = SHA256.Create();
         using var fsHash = System.IO.File.OpenRead(filePath);
         var hash = Convert.ToBase64String(sha.ComputeHash(fsHash));
 
-        return Ok(new { url, hash });
+        return Ok(new { link, hash });
     }
 
     /// <summary>
@@ -87,14 +87,14 @@ public class ImageController : ControllerBase
             .Select(fn =>
             {
                 var name = Path.GetFileName(fn);
-                var url = $"{_apiGatewayUrl}/uploads/{type}/{id}/{name}";
+                var link = $"{_apiGatewayUrl}/uploads/{type}/{id}/{name}";
 
                 // Calcular SHA-256
                 using var sha = SHA256.Create();
                 using var fsHash = System.IO.File.OpenRead(fn);
                 var hash = Convert.ToBase64String(sha.ComputeHash(fsHash));
 
-                return new { name, url, hash };
+                return new { name, link, hash };
             })
             .ToArray();
 

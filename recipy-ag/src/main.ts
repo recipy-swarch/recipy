@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as bodyParser from 'body-parser';
-import axios from 'axios';                      // <-- nuevo
+import axios from 'axios';
 import * as FormData from 'form-data';
 
 async function bootstrap() {
@@ -35,6 +35,15 @@ async function bootstrap() {
       target: process.env.USERAUTH_MS_URL,
       changeOrigin: true,
       pathRewrite: { '^/auth': '' , }, // quita el prefijo /auth
+    }),
+  );
+
+  // Proxy /uploads/* al servicio de imagenes
+  app.use(
+    '/uploads',
+    createProxyMiddleware({
+      target: process.env.IMAGE_API_URL,
+      changeOrigin: true,
     }),
   );
 
@@ -76,7 +85,8 @@ async function bootstrap() {
   };
 
   // 3.1. Middleware que sube imágenes a Imgur y reemplaza el array en el body
- const processImages = async (req: any, _res: any, next: any) => {
+  // TODO: Make this functional
+ const processImagesUser = async (req: any, _res: any, next: any) => {
    try {
      if (req.body?.images && Array.isArray(req.body.images)) {
        console.log('Uploading images to image-ms:', req.body.images);
@@ -95,7 +105,40 @@ async function bootstrap() {
              { headers: form.getHeaders() }
            );
            console.log('image-ms response:', data);
-           return data.data.link;
+           return data.link;
+         })
+       );
+       req.body.images = links;
+       console.log('Updated images in body:', req.body.images);
+       req.rawBody = JSON.stringify(req.body);
+       console.log('Updated raw body:', req.rawBody);
+     }
+     next();
+   } catch (err) {
+     next(err);
+   }
+ };
+
+  const processImagesRecipe = async (req: any, _res: any, next: any) => {
+   try {
+     if (req.body?.images && Array.isArray(req.body.images)) {
+       console.log('Uploading images to image-ms:', req.body.images);
+       const links = await Promise.all(
+         req.body.images.map(async (img: string, idx: number) => {
+           const form = new FormData()
+           const buffer = Buffer.from(img, 'base64')
+           // TODO: Nos va a tocar cambiar esto, porque siempre es png, además que siendo un base64, nos limitamos a archivos pequeños
+           form.append('image', buffer, { filename: `${idx + 1}.png` })
+           form.append('type', 'recipe')
+           form.append('id', req.recipeId ?? '0')
+
+           const { data } = await axios.post(
+             `${process.env.IMAGE_API_URL}/Image/upload`,
+             form,
+             { headers: form.getHeaders() }
+           );
+           console.log('image-ms response:', data);
+           return data.link;
          })
        );
        req.body.images = links;
@@ -122,7 +165,7 @@ async function bootstrap() {
     },
     addUserIdHeader,  // <-- primero obtenemos el id
     jsonParser,       // <-- luego el raw body
-    processImages,    // <-- subimos imágenes y actualizamos req.rawBody
+    processImagesRecipe,    // <-- subimos imágenes y actualizamos req.rawBody
     // Log the modified request body and headers after all modifications
     (req: any, _res: any, next: any) => {
       console.log('--- [RECIPE] Modified request ---');
@@ -151,6 +194,67 @@ async function bootstrap() {
         }
       },
     }),
+  );
+
+  // helper para subir imágenes y luego hacer patch en recipe-ms
+  async function uploadImagesAndPatch(images: string[], recipeId: string) {
+    const links = await Promise.all(
+      images.map(async (img, idx) => {
+        const form = new FormData();
+        form.append('image', Buffer.from(img, 'base64'), `${idx+1}.png`);
+        form.append('type', 'recipe');
+        form.append('id', recipeId);
+        const { data } = await axios.post(
+          `${process.env.IMAGE_API_URL}/Image/upload`,
+          form,
+          { headers: form.getHeaders() }
+        );
+        return data.data.link;
+      })
+    );
+    // patchea la receta con los links de imagen
+    await axios.patch(
+      `${process.env.RECIPE_MS_URL}/recipes/${recipeId}`,
+      { images: links }
+    );
+  }
+
+  app.use(
+    '/recipe',
+    addUserIdHeader,
+    jsonParser,
+    // quitamos processImagesRecipe de aquí
+    createProxyMiddleware({
+      target: process.env.RECIPE_MS_URL,
+      changeOrigin: true,
+      pathRewrite: { '^/recipe': '' },
+      onProxyReq(proxyReq, req: any) {
+        // extraemos imágenes del body y lo guardamos en memoria
+        if (req.body?.images) {
+          (req as any).__imgs = req.body.images;
+          delete req.body.images;
+          const body = JSON.stringify(req.body);
+          proxyReq.setHeader('Content-Type','application/json');
+          proxyReq.setHeader('Content-Length', Buffer.byteLength(body));
+          proxyReq.write(body);
+        }
+      },
+      onProxyRes(proxyRes, req: any, res) {
+        // cogemos la respuesta original y la reenviamos, pero antes subimos imágenes
+        const buf: Buffer[] = [];
+        proxyRes.on('data', chunk => buf.push(chunk));
+        proxyRes.on('end', async () => {
+          const text = Buffer.concat(buf).toString('utf8');
+          const json = JSON.parse(text);
+          const recipeId = json.id;
+          if ((req as any).__imgs?.length) {
+            await uploadImagesAndPatch((req as any).__imgs, recipeId);
+          }
+          res.writeHead(proxyRes.statusCode!, proxyRes.headers);
+          res.end(JSON.stringify(json));
+        });
+      },
+    })
   );
 
   await app.listen(3030);

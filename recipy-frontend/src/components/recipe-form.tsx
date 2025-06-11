@@ -4,7 +4,6 @@ import { useState, useRef, type FormEvent } from "react"
 import { createRecipe } from "@/lib/actions"
 import ImageUploader from "./image-uploader"
 import DynamicList from "./dynamic-list"
-import styles from "./recipe-form.module.css"
 
 export default function RecipeForm() {
   const [title, setTitle] = useState("")
@@ -35,24 +34,18 @@ export default function RecipeForm() {
       newErrors.steps = "Debes agregar al menos un paso"
     }
 
-    
-
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-
     if (!validateForm()) return
-
     setIsSubmitting(true)
 
     try {
-      // Filter out empty ingredients and steps
       const filteredIngredients = ingredients.filter((i) => i.trim())
       const filteredSteps = steps.filter((s) => s.trim())
-      
 
       const formData = new FormData()
       formData.append("title", title)
@@ -60,20 +53,14 @@ export default function RecipeForm() {
       formData.append("portions", portions.toString())
       formData.append("steps", JSON.stringify(filteredSteps))
 
-      // Append images
       images.forEach((image, index) => {
         formData.append(`image_${index}`, image)
       })
+
       const token = localStorage.getItem("token")
-      if (token){
-        await createRecipe(formData,token)
+      if (token) {
+        await createRecipe(formData, token)
       }
-      
-
-      
-
-      // Reset form after successful submission
-      
 
       alert("¡Receta creada con éxito!")
     } catch (error) {
@@ -85,72 +72,72 @@ export default function RecipeForm() {
   }
 
   return (
-    <form ref={formRef} className={styles.form} onSubmit={handleSubmit}>
-      <div className={styles.formGroup}>
-        <label htmlFor="title" className={styles.label}>
-          Título <span className={styles.required}>*</span>
+    <form ref={formRef} onSubmit={handleSubmit}>
+      <div className="mb-3">
+        <label htmlFor="title" className="form-label">
+          Título <span className="text-danger">*</span>
         </label>
         <input
           id="title"
           type="text"
-          className={styles.input}
+          className="form-control"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Ej: Pasta Carbonara"
         />
-        {errors.title && <p className={styles.error}>{errors.title}</p>}
+        {errors.title && <div className="text-danger">{errors.title}</div>}
       </div>
 
-      <div className={styles.formRow}>
-        <div className={styles.formGroup}>
-          <label htmlFor="prepTime" className={styles.label}>
-            Tiempo de preparación <span className={styles.required}>*</span>
+      <div className="row">
+        <div className="col-md-6 mb-3">
+          <label htmlFor="prepTime" className="form-label">
+            Tiempo de preparación <span className="text-danger">*</span>
           </label>
           <input
             id="prepTime"
             type="text"
-            className={styles.input}
+            className="form-control"
             value={prepTime}
             onChange={(e) => setPrepTime(e.target.value)}
             placeholder="Ej: 30 min"
           />
-          {errors.prepTime && <p className={styles.error}>{errors.prepTime}</p>}
+          {errors.prepTime && <div className="text-danger">{errors.prepTime}</div>}
         </div>
 
-        <div className={styles.formGroup}>
-          <label htmlFor="portions" className={styles.label}>
-            Porciones <span className={styles.required}>*</span>
+        <div className="col-md-6 mb-3">
+          <label htmlFor="portions" className="form-label">
+            Porciones <span className="text-danger">*</span>
           </label>
           <input
             id="portions"
             type="number"
             min="1"
-            className={styles.input}
+            className="form-control"
             value={portions}
             onChange={(e) => setPortions(Number.parseInt(e.target.value) || 1)}
           />
-          {errors.portions && <p className={styles.error}>{errors.portions}</p>}
+          {errors.portions && <div className="text-danger">{errors.portions}</div>}
         </div>
       </div>
 
-      <div className={styles.formGroup}>
-        <label htmlFor="description" className={styles.label}>
-          Descripción <span className={styles.required}>*</span>
+      <div className="mb-3">
+        <label htmlFor="description" className="form-label">
+          Descripción <span className="text-danger">*</span>
         </label>
         <textarea
           id="description"
-          className={styles.textarea}
+          className="form-control"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Describe tu receta brevemente..."
           rows={3}
         />
-        {errors.description && <p className={styles.error}>{errors.description}</p>}
+        {errors.description && <div className="text-danger">{errors.description}</div>}
       </div>
 
-      <div className={styles.formGroup}>
-        <label className={styles.label}>
-          Ingredientes <span className={styles.required}>*</span>
+      <div className="mb-3">
+        <label className="form-label">
+          Ingredientes <span className="text-danger">*</span>
         </label>
         <DynamicList
           items={ingredients}
@@ -158,12 +145,12 @@ export default function RecipeForm() {
           placeholder="Ej: 200g de harina"
           buttonText="Agregar ingrediente"
         />
-        {errors.ingredients && <p className={styles.error}>{errors.ingredients}</p>}
+        {errors.ingredients && <div className="text-danger">{errors.ingredients}</div>}
       </div>
 
-      <div className={styles.formGroup}>
-        <label className={styles.label}>
-          Pasos <span className={styles.required}>*</span>
+      <div className="mb-3">
+        <label className="form-label">
+          Pasos <span className="text-danger">*</span>
         </label>
         <DynamicList
           items={steps}
@@ -172,12 +159,12 @@ export default function RecipeForm() {
           buttonText="Agregar paso"
           isTextarea
         />
-        {errors.steps && <p className={styles.error}>{errors.steps}</p>}
+        {errors.steps && <div className="text-danger">{errors.steps}</div>}
       </div>
 
-      <div className={styles.formGroup}>
-        <label className={styles.label}>
-          Imágenes (1-5) <span className={styles.required}>*</span>
+      <div className="mb-3">
+        <label className="form-label">
+          Imágenes (1-5) <span className="text-danger">*</span>
         </label>
         <ImageUploader
           images={images}
@@ -186,14 +173,15 @@ export default function RecipeForm() {
           setPreviews={setPreviews}
           maxImages={5}
         />
-        {errors.images && <p className={styles.error}>{errors.images}</p>}
+        {errors.images && <div className="text-danger">{errors.images}</div>}
       </div>
 
-      <div className={styles.formActions}>
-        <button type="submit" className={styles.submitButton} disabled={isSubmitting}>
+      <div className="mb-3 text-end">
+        <button type="submit" className="btn" disabled={isSubmitting}>
           {isSubmitting ? "Creando..." : "Crear Receta"}
         </button>
       </div>
     </form>
   )
 }
+  

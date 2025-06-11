@@ -70,6 +70,7 @@
   height: 100px;
   border-radius: 4px;
   overflow: hidden;
+  transition: border 0.2s;
 }
 
 .previewImage {
@@ -110,4 +111,8 @@
   color: #e53e3e;
   font-size: 0.875rem;
   margin-top: 0.5rem;
+}
+
+.dragOver {
+  border: 2px dashed #0070f3;
 }

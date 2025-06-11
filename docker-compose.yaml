@@ -109,13 +109,15 @@ services:
       - frontend
   
   # Imgur MS (ASP.NET Core Web API)
-  imgur-ms:
+  image-ms:
     build:
-      context: ./imgur-ms
+      context: ./image-ms
     env_file:
       - .env
     ports:
       - "8080:8080"
+    volumes:
+      - ./image-ms/uploads:/app/wwwroot/uploads
     networks:
       - backend
 

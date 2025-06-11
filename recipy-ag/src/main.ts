@@ -90,7 +90,7 @@ async function bootstrap() {
            form.append('id', req.userId ?? '0')
 
            const { data } = await axios.post(
-             `${process.env.IMGUR_API_URL}/Image/upload`,
+             `${process.env.IMAGE_API_URL}/Image/upload`,
              form,
              { headers: form.getHeaders() }
            );

@@ -26,6 +26,11 @@ function eliminar_bases_datos() {
     echo "Bases de datos eliminadas."
 }
 
+function corregir_permisos_image_ms() {
+    echo "Corrigiendo permisos del volumen de la imagen recipe-ms..."
+    sudo chmod -R 777 image-ms/uploads
+}
+
 while true; do
     echo ""
     echo "Selecciona una opción:"
@@ -33,8 +38,9 @@ while true; do
     echo "2. Eliminar contenedores"
     echo "3. Construir las imágenes"
     echo "4. Correr los contenedores"
-    echo "5. Eliminar bases de datos"
-    echo "6. Salir"
+    echo "5. Corregir permisos del volumen recipe-ms"
+    echo "6. Eliminar bases de datos"
+    echo "0. Salir"
     read -p "Opción: " opcion
 
     case $opcion in
@@ -51,9 +57,12 @@ while true; do
             correr_contenedores
             ;;
         5)
-            eliminar_bases_datos
+            corregir_permisos_image_ms
             ;;
         6)
+            eliminar_bases_datos
+            ;;
+        0)
             echo "Saliendo..."
             break
             ;;

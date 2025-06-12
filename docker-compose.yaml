@@ -125,7 +125,7 @@ services:
       context: ./mail-ms
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "8085:8080"
     env_file:
       - .env      # Carga MAIL_SMTP_* y AMQP_URL
     depends_on:

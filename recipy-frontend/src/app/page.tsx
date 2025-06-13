@@ -48,8 +48,8 @@ export default function RecipesPage() {
           {/* Content Section */}
           <div className="card-body d-flex flex-column">
             <h5 className="card-title fs-4 fw-bold">{recipe.title}</h5>
-            <p className="card-text mb-1 text-muted">⏱️ {recipe.prep_time} | 🍽️ Porciones: {recipe.portions}</p>
-            <p className="card-text text-truncate" style={{
+            <p className=".card-body mb-1">⏱ {recipe.prep_time} | Porciones: {recipe.portions}</p>
+            <p className=".card-body" style={{
               display: '-webkit-box',
               WebkitLineClamp: 4,
               WebkitBoxOrient: 'vertical',
@@ -64,24 +64,6 @@ export default function RecipesPage() {
     ))}
   </div>
 </div>
-        // <div className="container mt-4">
-        //     <h1 className="mb-4">Recipes</h1>
-        //     <div className="row">
-        //         {recipes.slice().reverse().map((recipe) => (
-        //     <div key={recipe.id} className="col-12 mb-4">
-        //         <div className="card h-100">
-        //             <div className="card-body">
-        //                 <div>{recipe.images}</div>
-        //                 <h5 className="card-title">{recipe.title}</h5>
-        //                 <p className="card-text">Time: {recipe.prep_time}</p>
-        //                 <p className="card-text">Description: {recipe.description}</p>
-        //                 <p className="card-text">Steps: {recipe.steps}</p>
-        //             </div>
-        //         </div>
-        //     </div>
-        // ))}
-        //     </div>
-        // </div>
     );
 }
 

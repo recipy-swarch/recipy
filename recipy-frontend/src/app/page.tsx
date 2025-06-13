@@ -49,7 +49,7 @@ export default function RecipesPage() {
           <div className="card-body d-flex flex-column">
             <Link href={`/recipe/${recipe.id}`} className="card-title fs-4 fw-bold">{recipe.title}</Link>
             <div className=".card-body mb-1 d-flex justify-content-between">
-              <p>Publicado por: <Link style={{color:"#DDBCE5"}} href={`/recipe/${recipe.id}`}>{recipe.user_id}</Link></p>
+              <p>Publicado por: <Link style={{color:"#DDBCE5"}} href={`/profile/${recipe.user_id}`}>{recipe.user_id}</Link></p>
               <p>⏱ {recipe.prep_time} | Porciones: {recipe.portions}</p>
             </div>
             <p className=".card-body" style={{

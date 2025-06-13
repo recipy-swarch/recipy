@@ -4,7 +4,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./globals.css";
 import "./navbar.css";
-import ClientLayout from "@/components/clientLayout"; // Asegúrate de que la ruta es correcta
+import ClientLayout from "@/components/clientLayout";
+
+import { AuthProvider } from "@/context/authContext";
+import Navbar from "@/components/Navbar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,33 +35,9 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <nav className="navbar bg-body-transparent px-3">
-          <a className="navbar-brand" href="/#">Navbar</a>
-          <ul className="nav nav-pills">
-            <li className="nav-item">
-              <button className="btn">
-                <a className="nav-link" href="/create-recipe">create recipe</a>
-              </button>
-            </li>
-            <li className="nav-item">
-              <button className="btn">
-                <a className="nav-link" href="/profile">My profile</a>
-              </button>
-            </li>
-            <li className="nav-item">
-              <button className="btn">
-                <a className="nav-link" href="/login">login</a>
-              </button>
-            </li>
-            <li className="nav-item">
-              <button className="btn special-btn">
-                <a className="nav-link" href="/register">Register</a>
-              </button>
-            </li>
-          </ul>
-        </nav>
-
-        <ClientLayout>{children}</ClientLayout>
+        <AuthProvider>
+          <Navbar/>
+          <ClientLayout>{children}</ClientLayout>
 
         <div className="container-fluid footer">
           <footer className="p-5">
@@ -81,6 +60,8 @@ export default function RootLayout({
             </div>
           </footer>
         </div>
+        </AuthProvider>
+        
       </body>
     </html>
   );

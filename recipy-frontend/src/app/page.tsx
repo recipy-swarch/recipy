@@ -47,8 +47,11 @@ export default function RecipesPage() {
 
           {/* Content Section */}
           <div className="card-body d-flex flex-column">
-            <h5 className="card-title fs-4 fw-bold">{recipe.title}</h5>
-            <p className=".card-body mb-1">⏱ {recipe.prep_time} | Porciones: {recipe.portions}</p>
+            <Link href={`/recipe/${recipe.id}`} className="card-title fs-4 fw-bold">{recipe.title}</Link>
+            <div className=".card-body mb-1 d-flex justify-content-between">
+              <p>Publicado por: <Link style={{color:"#DDBCE5"}} href={`/recipe/${recipe.id}`}>{recipe.user_id}</Link></p>
+              <p>⏱ {recipe.prep_time} | Porciones: {recipe.portions}</p>
+            </div>
             <p className=".card-body" style={{
               display: '-webkit-box',
               WebkitLineClamp: 4,
@@ -57,7 +60,7 @@ export default function RecipesPage() {
             }}>
               {recipe.description}
             </p>
-            <Link href={`/recipe/${recipe.id}`} className="mt-auto btn btn-primary align-self-start">Ver receta</Link>
+
           </div>
         </div>
       </div>

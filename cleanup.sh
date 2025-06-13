@@ -8,6 +8,10 @@ function detener_contenedores() {
 function eliminar_contenedores() {
     echo "Eliminando contenedores..."
     sudo docker compose rm
+    echo "Eliminando contenedore no usados..."
+    sudo docker container prune -f
+    echo "Eliminando imágenes no usadas..."
+    sudo docker image prune -f
 }
 
 function construir_imagenes() {
@@ -28,6 +32,8 @@ function eliminar_bases_datos() {
 
 function corregir_permisos_image_ms() {
     echo "Corrigiendo permisos del volumen de la imagen recipe-ms..."
+    mkdir -p image-ms/uploads
+    sudo chown -R 1000:1000 image-ms/uploads
     sudo chmod -R 777 image-ms/uploads
 }
 
@@ -35,7 +41,7 @@ while true; do
     echo ""
     echo "Selecciona una opción:"
     echo "1. Detener contenedores"
-    echo "2. Eliminar contenedores"
+    echo "2. Eliminar contenedores, e imágenes no usadas"
     echo "3. Construir las imágenes"
     echo "4. Correr los contenedores"
     echo "5. Corregir permisos del volumen recipe-ms"

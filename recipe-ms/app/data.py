@@ -10,7 +10,6 @@ def load_initial_data():
             id=1,
             title="Spaghetti Bolognese",
             prep_time="30 min",
-            images=["spaghetti1.jpg", "spaghetti2.jpg"],
             video="spaghetti_bolognese.mp4",
             portions=4,
             steps=[
@@ -24,7 +23,6 @@ def load_initial_data():
             id=2,
             title="Grilled Cheese Sandwich",
             prep_time="10 min",
-            images=["grilled_cheese.jpg"],
             video=None,
             portions=2,
             steps=[

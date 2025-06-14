@@ -6,7 +6,6 @@ def get_initial_recipes() -> list[dict]:
           # no incluyas “id” para dejar que Mongo asigne un ObjectId
           "title": "Spaghetti Bolognese",
           "prep_time": "30 min",
-          "images": ["spaghetti1.jpg", "spaghetti2.jpg"],
           "video": "spaghetti_bolognese.mp4",
           "portions": 4,
           "steps": ["Boil pasta.", "Cook meat.", "Mix together."]
@@ -14,7 +13,6 @@ def get_initial_recipes() -> list[dict]:
         {
           "title": "Grilled Cheese Sandwich",
           "prep_time": "10 min",
-          "images": ["grilled_cheese.jpg"],
           "video": None,
           "portions": 2,
           "steps": ["Butter bread.", "Add cheese.", "Grill."]

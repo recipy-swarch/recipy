@@ -17,7 +17,6 @@ def get_initial_recipes() -> list[dict]:
           "title": "Grilled Cheese Sandwich",
           "description": "description 2",
           "prep_time": "10 min",
-          "images": ["grilled_cheese.jpg"],
           "video": None,
           "portions": 2,
           "steps": ["Butter bread.", "Add cheese.", "Grill."]

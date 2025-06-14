@@ -11,7 +11,6 @@ def load_initial_data():
             title="Spaghetti Bolognese",
             description= "description 1",
             prep_time="30 min",
-            images=["spaghetti1.jpg", "spaghetti2.jpg"],
             video="spaghetti_bolognese.mp4",
             portions=4,
             steps=[
@@ -26,7 +25,6 @@ def load_initial_data():
             title="Grilled Cheese Sandwich",
             description= "description 2",
             prep_time="10 min",
-            images=["grilled_cheese.jpg"],
             video=None,
             portions=2,
             steps=[

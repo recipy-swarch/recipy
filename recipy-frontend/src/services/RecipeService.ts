@@ -34,13 +34,12 @@ class RecipeService {
     return data as IRecipe[];
   };
 
-  fetchUserRecipes = async (userId: number): Promise<IRecipe[]> => {
+  fetchUserRecipes = async (userId: string): Promise<IRecipe[]> => {
     const response = await fetch(
-      `${this.apiUrl}/recipe/graphql/get_recipes`, // <-- usando userId
+      `${this.apiUrl}/graphql/get_recipebyuserNA/${userId}`, // <-- Usando el endpoint correcto sin auth
       {
         method: "GET",
         headers: {
-          Authorization: "Bearer token", // Aquí probablemente debes pasar un token válido real
           "Content-Type": "application/json",
         },
       }
@@ -57,11 +56,26 @@ class RecipeService {
 
     return data as IRecipe[];
   };
-  // Helper que lee un File y devuelve sólo el payload Base64
-  private async readFileAsBase64(file: File): Promise<string> {
-    const arrayBuffer = await file.arrayBuffer();
-    return Buffer.from(arrayBuffer).toString("base64");
-  }
+
+  fetchUserRecipesNA = async (userId: string): Promise<IRecipe[]> => {
+    const url = `${
+      this.apiUrl
+    }/recipe/graphql/get_recipebyuserNA?user_id=${encodeURIComponent(userId)}`;
+    console.log("→ Calling GET", url);
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("Error response:", text);
+      throw new Error(`Error fetching recipes: ${response.status}`);
+    }
+
+    return (await response.json()) as IRecipe[];
+  };
 
   private async formDataToJson(formData: FormData) {
     const obj: any = {};

@@ -37,8 +37,8 @@ export default function ProfilePage() {
   useEffect(() => {
     const getRecipes = async () => {
       if (id) {
-        const result = await fetchUserRecipes(Number(id));
-        console.log(id);
+        const result = await fetchUserRecipes(id);
+        console.log("ID en frontend:", id);
         if (result.success) {
           setRecipes(result.recipes);
         }

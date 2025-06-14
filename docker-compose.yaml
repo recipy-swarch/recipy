@@ -144,7 +144,21 @@ services:
     networks:
       - backend
 
-  # También para los tests de userauth-ms con token-db
+  # Servicio de correo asíncrono
+  mail-ms:
+    build:
+      context: ./mail-ms
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8080"
+    env_file:
+      - .env      # Carga MAIL_SMTP_* y AMQP_URL
+    depends_on:
+      - mail-broker
+    networks:
+      - backend
+    restart: always
+
   # Broker de mensajes (RabbitMQ)
   mail-broker:
     image: rabbitmq:3-management

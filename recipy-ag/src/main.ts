@@ -144,6 +144,16 @@ async function bootstrap() {
     }),
   );
 
+    // Proxy para el microservicio de correo (mail-ms)
+  app.use(
+    '/mail',
+    createProxyMiddleware({
+      target: process.env.MAIL_MS_URL,
+      changeOrigin: true,
+      pathRewrite: { '^/mail': '' }, // elimina /mail del path
+    }),
+  );
+
   await app.listen(3030);
   console.log('API Gateway escuchando en http://0.0.0.0:3030');
 }

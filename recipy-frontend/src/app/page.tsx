@@ -3,6 +3,7 @@
 import styles from "./page.module.css";
 import Link from "next/link";
 import { fetchAllRecipes } from "@/lib/actions";
+import Image from "next/image";
 
 import { useEffect, useState } from "react";
 
@@ -31,10 +32,18 @@ export default function RecipesPage() {
             <div key={recipe.id} className="col-12 mb-4">
                 <div className="card h-100">
                     <div className="card-body">
-                        <div>{recipe.images}</div>
                         <h5 className="card-title">{recipe.title}</h5>
                         <p className="card-text">Time: {recipe.prepTime}</p>
                         <p className="card-text">Steps: {recipe.steps}</p>
+                        {// Este es un ejemplo de cómo mostrar imágenes, asumiendo que recipe.images es un array de URLs, Puedes eliminarlo y ver como lo implementas tú
+                        recipe.images && recipe.images[0] && (
+                            <Image
+                                src={recipe.images[0]}
+                                alt="User avatar"
+                                width={200}
+                                height={200}
+                            />
+                        )}
                     </div>
                 </div>
             </div>

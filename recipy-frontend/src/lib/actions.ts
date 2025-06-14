@@ -31,10 +31,10 @@ export async function fetchAllRecipes() {
   }
 }
 
-export async function fetchUserRecipes(userId: number) {
+export async function fetchUserRecipes(userId: string) {
   try {
     console.log("Fetching user recipes for userId:", userId);
-    const recipes = await RecipeService.fetchUserRecipes(userId);
+    const recipes = await RecipeService.fetchUserRecipesNA(userId);
     return { success: true, recipes };
   } catch (error) {
     console.error("Error fetching recipes:", error);

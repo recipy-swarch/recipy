@@ -167,6 +167,39 @@ def login():
     return jsonify({"token": token})
 
 
+
+
+@app.route("/profile/<int:user_id>", methods=["GET"])
+def public_profile(user_id):
+    """
+    Endpoint público para obtener datos de perfil de cualquier usuario por su ID.
+    No requiere autenticación.
+    """
+    r = pg(f"users?id=eq.{user_id}", headers={"Accept": "application/json"})
+
+    if r.status_code != 200 or not r.json():
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    user = r.json()[0]
+
+    # Retornar solo campos públicos
+    public_data = {
+        "id": user["id"],
+        "username": user["username"],
+        "name": user["name"],
+        "profile_picture": user.get("profile_picture"),
+        "biography": user.get("biography"),
+        "location": user.get("location"),
+    }
+
+    return jsonify(public_data), 200
+
+
+
+
+
+
+
 @app.route("/profile", methods=["GET", "PUT"])
 @jwt_required()
 def profile():

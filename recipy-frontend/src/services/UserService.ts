@@ -1,5 +1,3 @@
-
-
 import { IUserRegister } from "@/interfaces/IUser";
 
 class UserService {
@@ -12,7 +10,7 @@ class UserService {
     // Lanza un error si la URL no está definida
 
   constructor() {
-        this.apiUrl = process.env.API_GATEWAY_URL || '' 
+        this.apiUrl = process.env.NEXT_PUBLIC_API_GATEWAY_URL || '';
         console.log("este es mi ", this.apiUrl);
         if (this.apiUrl === '') {
             throw new Error('API URL is not defined')
@@ -76,6 +74,30 @@ class UserService {
     }
     return true;
   };
+
+  getPublicProfile = async (userId: number) : Promise<any> => {
+    try {
+      const response = await fetch(`${this.apiUrl}/profile/${userId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Error fetching public profile:", text);
+        throw new Error(`Error ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+
+    } catch (error) {
+      console.error("Error in getPublicProfile:", error);
+      this.error = (error as Error).message;
+      return null;
+    }
+  };
+
 }
 
 const userService = new UserService();

@@ -6,26 +6,40 @@ import loginHero from '../components/login-hero.jpg';
 import { useRouter } from "next/navigation";
 import { loginUser } from "@/lib/userActions";  // Nuevo import
 
+
+import { useAuth } from "@/context/authContext"; // Importa el context
+
+
+
 export default function LoginPage() {
+    const { login } = useAuth();
+    const { isLoggedIn } = useAuth();
+    
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const router = useRouter();
 
+
+
     const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError("");
-        const result = await loginUser({ username, password });
-        if (result.success) {
-            if (result.token) {
-                router.push("/");  // Ajusta la ruta de destino según tu flujo
-                localStorage.setItem("token",result.token);
-            }
-            
-        } else {
-            setError(result.error as string || "Error de inicio de sesión");
-        }
-    };
+    e.preventDefault();
+    setError("");
+    const result = await loginUser({ username, password });
+    if (result.success) {
+      if (result.token) {
+        localStorage.setItem("token", result.token);
+        login(); // activa el contexto de login
+        router.push("/"); 
+      }
+    } else {
+      setError(result.error as string || "Error de inicio de sesión");
+    }
+    
+  };
+
+    
+    
 
     return (
         <div className="container-fluid h-100 p-0">

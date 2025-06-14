@@ -56,17 +56,9 @@ class RecipeService {
         };
 
     // Helper que lee un File y devuelve sólo el payload Base64
-    private readFileAsBase64(file: File): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                // reader.result = "data:<mime>;base64,<BASE64…>"
-                const base64 = (reader.result as string).split(',')[1];
-                resolve(base64);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
+    private async readFileAsBase64(file: File): Promise<string> {
+        const arrayBuffer = await file.arrayBuffer();
+        return Buffer.from(arrayBuffer).toString('base64');
     }
 
     private async formDataToJson(formData: FormData) {

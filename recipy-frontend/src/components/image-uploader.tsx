@@ -14,6 +14,8 @@ interface ImageUploaderProps {
 
 export default function ImageUploader({ images, setImages, previews, setPreviews, maxImages = 5 }: ImageUploaderProps) {
   const [error, setError] = useState<string | null>(null)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -76,6 +78,21 @@ export default function ImageUploader({ images, setImages, previews, setPreviews
     setPreviews(newPreviews)
   }
 
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    if (dragIndex === null || dragOverIndex === null || dragIndex === dragOverIndex) return
+    const imgs = [...images]
+    const prevs = [...previews]
+    const [movedImg] = imgs.splice(dragIndex, 1)
+    const [movedPrev] = prevs.splice(dragIndex, 1)
+    imgs.splice(dragOverIndex, 0, movedImg)
+    prevs.splice(dragOverIndex, 0, movedPrev)
+    setImages(imgs)
+    setPreviews(prevs)
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.dropzone}>
@@ -102,8 +119,23 @@ export default function ImageUploader({ images, setImages, previews, setPreviews
       {previews.length > 0 && (
         <div className={styles.previewContainer}>
           {previews.map((preview, index) => (
-            <div key={index} className={styles.previewItem}>
-              <img src={preview || "/placeholder.svg"} alt={`Preview ${index + 1}`} className={styles.previewImage} />
+            <div
+              key={index}
+              className={
+                styles.previewItem +
+                (dragOverIndex === index ? ` ${styles.dragOver}` : "")
+              }
+              draggable
+              onDragStart={() => setDragIndex(index)}
+              onDragOver={e => { e.preventDefault(); setDragOverIndex(index) }}
+              onDragLeave={() => setDragOverIndex(null)}
+              onDrop={handleDrop}
+            >
+              <img
+                src={preview}
+                alt={`Preview ${index + 1}`}
+                className={styles.previewImage}
+              />
               <button
                 type="button"
                 className={styles.removeButton}

@@ -4,7 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>imgur_ms</RootNamespace>
+    <RootNamespace>image_ms</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

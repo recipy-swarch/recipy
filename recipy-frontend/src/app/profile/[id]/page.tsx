@@ -1,33 +1,35 @@
 "use client";
 
-import { useAuth } from "@/context/authContext";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import userService from "@/services/UserService";
+import { useAuth } from "@/context/authContext";
 
 export default function ProfilePage() {
-  const { isLoggedIn, userId } = useAuth();
+  const { id } = useParams(); // id viene de la URL (por ejemplo /profile/1)
   const router = useRouter();
+  const { userId } = useAuth(); // solo si quieres comparar para el botón de editar
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isLoggedIn || !userId) {
-      router.push("/login");
-      return;
-    }
     const fetchProfile = async () => {
       try {
-        const data = await userService.getPublicProfile(userId);
+        const data = await userService.getPublicProfile(Number(id));
+        console.log("Perfil recibido:", data);
         setProfile(data);
       } catch (error) {
         console.error("Error fetching profile:", error);
       } finally {
         setLoading(false);
       }
+      
     };
-    fetchProfile();
-  }, [isLoggedIn, userId, router]);
+
+    if (id) {
+      fetchProfile();
+    }
+  }, [id]);
 
   if (loading) return <p>Cargando perfil...</p>;
   if (!profile) return <p>No se pudo cargar el perfil.</p>;
@@ -43,14 +45,16 @@ export default function ProfilePage() {
                   <h5>{profile.username}</h5>
                   <p>{profile.location || "Sin ubicación"}</p>
                 </div>
-                <button
-                  type="button"
-                  className="btn w-auto align-self-start"
-                  style={{ zIndex: 1 }}
-                  onClick={() => router.push('/edit-profile')}
-                >
-                  Edit profile
-                </button>
+                {userId === Number(id) && ( // solo muestra "Editar perfil" si es su propio perfil
+                  <button
+                    type="button"
+                    className="btn w-auto align-self-start"
+                    style={{ zIndex: 1 }}
+                    onClick={() => router.push('/edit-profile')}
+                  >
+                    Edit profile
+                  </button>
+                )}
               </div>
               <div className="d-flex justify-content-end text-center py-1 text-body">
                 <div>
@@ -71,9 +75,8 @@ export default function ProfilePage() {
               <div className="mb-5 text-body">
                 <p className="lead fw-normal mb-1">About</p>
                 <div className="p-4 bg-body-tertiary">
-                  <p className="font-italic mb-1">{profile.bio || "Sin descripción"}</p>
+                  <p className="font-italic mb-1">{profile.biography || "Sin descripción"}</p>
                   <p className="font-italic mb-1">Lives in {profile.location || "N/A"}</p>
-                  <p className="font-italic mb-0">{profile.occupation || "Sin ocupación"}</p>
                 </div>
               </div>
               <div className="d-flex justify-content-between align-items-center mb-4 text-body">

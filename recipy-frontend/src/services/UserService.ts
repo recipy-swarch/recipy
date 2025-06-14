@@ -77,7 +77,7 @@ class UserService {
 
   getPublicProfile = async (userId: number) : Promise<any> => {
     try {
-      const response = await fetch(`${this.apiUrl}/profile/${userId}`, {
+      const response = await fetch(`${this.apiUrl}/user/profile/${userId}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });

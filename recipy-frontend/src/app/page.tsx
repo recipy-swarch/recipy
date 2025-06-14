@@ -3,6 +3,7 @@
 import styles from "./page.module.css";
 import Link from "next/link";
 import { fetchAllRecipes } from "@/lib/actions";
+import Image from "next/image";
 
 import { useEffect, useState } from "react";
 
@@ -51,6 +52,7 @@ export default function RecipesPage() {
             <div className=".card-body mb-1 d-flex justify-content-between">
               <p>Publicado por: <Link style={{color:"#DDBCE5"}} href={`/profile/${recipe.user_id}`}>{recipe.user_id}</Link></p>
               <p>⏱ {recipe.prep_time} | Porciones: {recipe.portions}</p>
+
             </div>
             <p className=".card-body" style={{
               display: '-webkit-box',

@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
+//using Microsoft.Extensions.Configuration;
 using System.IO;
 using System.Net.Mime;
 using System.Security.Cryptography;    // ← añadir
@@ -12,12 +12,13 @@ namespace image_ms.Controllers;
 public class ImageController : ControllerBase
 {
     private readonly IWebHostEnvironment _env;
-    private readonly string _apiGatewayUrl;
+    //private readonly string _apiGatewayUrl;
 
-    public ImageController(IWebHostEnvironment env, IConfiguration config)
+    //public ImageController(IWebHostEnvironment env, IConfiguration config)
+    public ImageController(IWebHostEnvironment env)
     {
         _env = env;
-        _apiGatewayUrl = config["Image:API_GATEWAY_URL"];
+        //_apiGatewayUrl = config["Image:API_GATEWAY_URL"];
     }
 
     /// <summary>
@@ -54,7 +55,8 @@ public class ImageController : ControllerBase
         var filePath = Path.Combine(uploadsRoot, fileName);
         await System.IO.File.WriteAllBytesAsync(filePath, bytes);
 
-        var link = $"{_apiGatewayUrl}/uploads/{type}/{id}/{fileName}";
+        //var link = $"{_apiGatewayUrl}/uploads/{type}/{id}/{fileName}";
+        var link = $"/api/image/uploads/{type}/{id}/{fileName}"; // Cambios para coincidir con el API del frontend
         return Ok(new { link, hash });
     }
 
@@ -71,7 +73,7 @@ public class ImageController : ControllerBase
         // Calcular SHA-256
         using var sha = SHA256.Create();
         using var fsHash = System.IO.File.OpenRead(filePath);
-        var hash = Convert.ToString(sha.ComputeHash(fsHash)).Replace("-", "").ToLowerInvariant();
+        var hash = BitConverter.ToString(sha.ComputeHash(fsHash)).Replace("-", "").ToLowerInvariant();
         Response.Headers.Add("X-Content-Sha256", hash); // Este se añade al header de la respuesta
 
         var contentType = GetContentType(filePath);
@@ -93,12 +95,13 @@ public class ImageController : ControllerBase
             .Select(fn =>
             {
                 var name = Path.GetFileName(fn);
-                var link = $"{_apiGatewayUrl}/uploads/{type}/{id}/{name}";
+                //var link = $"{_apiGatewayUrl}/uploads/{type}/{id}/{name}";
+                var link = $"/api/image/uploads/{type}/{id}/{name}"; // Cambios para coincidir con el API del frontend
 
                 // Calcular SHA-256
                 using var sha = SHA256.Create();
                 using var fsHash = System.IO.File.OpenRead(fn);
-                var hash = Convert.ToString(sha.ComputeHash(fsHash)).Replace("-", "").ToLowerInvariant();
+                var hash = BitConverter.ToString(sha.ComputeHash(fsHash)).Replace("-", "").ToLowerInvariant();
 
                 return new { name, link, hash };
             })

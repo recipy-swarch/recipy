@@ -79,6 +79,11 @@ class RecipeService {
     return (await response.json()) as IRecipe[];
   };
 
+  private async readFileAsBase64(file: File): Promise<string> {
+    const arrayBuffer = await file.arrayBuffer();
+    return Buffer.from(arrayBuffer).toString("base64");
+  }
+
   private async formDataToJson(formData: FormData) {
     const obj: any = {};
     const images: string[] = [];

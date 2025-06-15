@@ -4,17 +4,17 @@ load_dotenv()   # <- esto importa las JWT_SECRET y JWT_ALGO desde .env
 from strawberry.fastapi import GraphQLRouter
 import strawberry
 
-from app.schema import Query, Mutation
+from app.schema import Query, Mutation, Comment, Recipe, get_current_user_id, Like
 from app.db import client, get_collection
 from app.initial_data import get_initial_recipes
 from app.data import load_initial_data  # función que pobla la lista en memoria
 from fastapi import FastAPI, Request, HTTPException, Body, status
 from typing import List
 from app.db import get_collection
-from app.schema import Recipe  # tu dataclass Strawberry
-from app.schema import get_current_user_id  # tu helper
 from datetime import datetime
 from bson import ObjectId
+from app.schema import CommentOut, CommentWithRepliesOut
+from pydantic import BaseModel, Field
 
 # 1. Definir el esquema
 schema = strawberry.Schema(query=Query, mutation=Mutation)
@@ -29,6 +29,11 @@ graphql_app = GraphQLRouter(
     allow_queries_via_get=True,  # <-- permite consultas GET
     context_getter=get_context   # <-- use nuestra función con tipo Request
 )
+
+class CommentWithReplies(Comment):
+    replies: List[Comment]
+class CommentUpdateIn(BaseModel):
+    content: str = Field(..., min_length=1)
 
 app = FastAPI(title="Recipe Service")
 app.include_router(graphql_app, prefix="/graphql")
@@ -145,106 +150,290 @@ async def create_recipe(request: Request, payload: dict = Body(...)):
     saved = await coll.find_one({"_id": res.inserted_id})
     saved["id"] = str(saved.pop("_id"))
     return Recipe(**saved)
+#obtener los comentarios de una receta
+@app.get(
+    "/comments_recipes/{recipe_id}",
+    response_model=List[Comment],
+    responses={
+        200: {"description": "OK: lista de comentarios"},
+        400: {"description": "Bad Request: recipe_id inválido"},
+        404: {"description": "Not Found: receta no existe"}
+    }
+)
+async def get_comments_for_recipe(recipe_id: str, request: Request):
+    # 1) Validar recipe_id como ObjectId
+    try:
+        _ = ObjectId(recipe_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="`recipe_id` no es un ID válido")
+    
+    # 2) Verificar que la receta existe (opcional, pero recomendado)
+    coll_recipes = get_collection("recipes")
+    if not await coll_recipes.find_one({"_id": ObjectId(recipe_id)}):
+        raise HTTPException(status_code=404, detail="Receta no encontrada")
 
+    # 3) Recuperar comentarios
+    coll_comments = get_collection("comments")
+    raw = await coll_comments.find({"recipe_id": recipe_id}).to_list(100)
+
+    comments: List[Comment] = []
+    for c in raw:
+        c["id"] = str(c.pop("_id"))
+        comments.append(Comment(**c))
+
+    return comments
+
+@app.get(
+    "/recipes/{recipe_id}/comments",
+    response_model=List[CommentWithRepliesOut],
+    responses={
+        200: {"description": "OK: comentarios con sus replies"},
+        400: {"description": "Bad Request: recipe_id inválido"},
+        404: {"description": "Not Found: receta no existe"},
+    },
+    status_code=status.HTTP_200_OK
+)
+async def list_comments_with_replies(recipe_id: str):
+    # 1) Validar recipe_id
+    try:
+        oid = ObjectId(recipe_id)
+    except:
+        raise HTTPException(400, "`recipe_id` no es un ID válido")
+
+    # 2) Verificar receta existe
+    coll_recipes = get_collection("recipes")
+    if not await coll_recipes.find_one({"_id": oid}):
+        raise HTTPException(404, "Receta no encontrada")
+
+    # 3) Obtener comentarios padre
+    coll_comments = get_collection("comments")
+    raw_comments = await coll_comments.find({
+        "recipe_id": recipe_id,
+        "parent_id": None
+    }).to_list(100)
+
+    results: List[CommentWithRepliesOut] = []
+    for doc in raw_comments:
+        # Normalizar el documento Mongo a dict Pydantic
+        base = {
+            "id": str(doc["_id"]),
+            "recipe_id": doc["recipe_id"],
+            "user_id": doc["user_id"],
+            "content": doc["content"],
+            "parent_id": doc.get("parent_id"),
+            "created_at": doc["created_at"],
+        }
+
+        # 4) Recuperar sus replies
+        raw_replies = await coll_comments.find({"parent_id": base["id"]}).to_list(100)
+        replies = [
+            {
+                "id": str(r["_id"]),
+                "recipe_id": r["recipe_id"],
+                "user_id": r["user_id"],
+                "content": r["content"],
+                "parent_id": r.get("parent_id"),
+                "created_at": r["created_at"],
+            }
+            for r in raw_replies
+        ]
+
+        # 5) Construir el Pydantic model
+        results.append(CommentWithRepliesOut(**{**base, "replies": replies}))
+
+    return results
+# --- PUT  /comments/{comment_id} ---
+@app.put(
+    "/comments/{comment_id}",
+    response_model=CommentOut,
+    responses={
+        200: {"description": "OK: comentario actualizado"},
+        400: {"description": "Bad Request: comment_id inválido o body mal formado"},
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden: no eres el autor"},
+        404: {"description": "Not Found: comentario no existe"},
+    },
+    status_code=status.HTTP_200_OK
+)
+async def rest_update_comment(
+    comment_id: str,
+    request: Request,
+    payload: CommentUpdateIn
+):
+    # 1) Validar comment_id
+    try:
+        oid = ObjectId(comment_id)
+    except:
+        raise HTTPException(400, detail="`comment_id` no es un ID válido")
+
+    # 2) Autenticación
+    try:
+        info    = type("Info", (), {"context": {"request": request}})
+        user_id = get_current_user_id(info)
+    except HTTPException as e:
+        raise e
+
+    coll = get_collection("comments")
+
+    # 3) Recuperar el comentario
+    original = await coll.find_one({"_id": oid})
+    if not original:
+        raise HTTPException(404, detail="Comentario no existe")
+
+    # 4) Verificar autoría
+    if original.get("user_id") != user_id:
+        raise HTTPException(403, detail="No puedes editar este comentario")
+
+    # 5) Actualizar contenido
+    await coll.update_one(
+        {"_id": oid},
+        {"$set": {"content": payload.content}}
+    )
+
+    # 6) Leer y normalizar
+    updated = await coll.find_one({"_id": oid})
+    updated["id"] = str(updated.pop("_id"))
+    return CommentOut(**updated)
+
+
+# --- DELETE /comments/{comment_id} ---
 @app.delete(
-    "/graphql/delete_recipebyuser",
-    response_model=List[Recipe],
+    "/comments/{comment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {"description": "No Content: borrado OK"},
+        400: {"description": "Bad Request: comment_id inválido"},
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden: no eres el autor"},
+        404: {"description": "Not Found: comentario no existe"},
+    }
+)
+async def rest_delete_comment(comment_id: str, request: Request):
+    # 1) Validar comment_id
+    try:
+        oid = ObjectId(comment_id)
+    except:
+        raise HTTPException(400, detail="`comment_id` no es un ID válido")
+
+    # 2) Autenticación
+    try:
+        info    = type("Info", (), {"context": {"request": request}})
+        user_id = get_current_user_id(info)
+    except HTTPException as e:
+        raise e
+
+    coll = get_collection("comments")
+
+    # 3) Borrar condicional por autor
+    res = await coll.delete_one({"_id": oid, "user_id": user_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, detail="Comentario no existe o no tienes permiso")
+
+    # 4) FastAPI enviará 204 No Content automáticamente
+    return
+
+# — POST /graphql/like_recipe
+@app.post(
+    "/graphql/like_recipe",
+    response_model=Like,
+    status_code=status.HTTP_201_CREATED,
     responses={
         400: {"description": "Bad Request: recipe_id inválido o ausente"},
         401: {"description": "Unauthorized"},
-        404: {"description": "Not Found: no existe o no te pertenece"}
-    },
-    status_code=status.HTTP_200_OK
+        404: {"description": "Not Found: receta no existe"},
+        409: {"description": "Conflict: ya habías dado like"}
+    }
 )
-async def delete_recipe_by_user(request: Request):
-    # 1) Extraer user_id
-    try:
-        info = type("Info", (), {"context": {"request": request}})
-        user_id = get_current_user_id(info)
-    except HTTPException as e:
-        raise e
-
-    # 2) Leer recipe_id
+async def rest_like_recipe(request: Request):
+    # 1) Extraer recipe_id de query params
     recipe_id = request.query_params.get("recipe_id")
     if not recipe_id:
         raise HTTPException(400, detail="Falta el parámetro `recipe_id`")
-
-    # 3) Validar ObjectId
+    # 2) Validar ObjectId
     try:
         oid = ObjectId(recipe_id)
     except Exception:
         raise HTTPException(400, detail="`recipe_id` no es un ID válido")
-
-    coll = get_collection("recipes")
-
-    # 4) Borrar condicional por user_id
-    res = await coll.delete_one({"_id": oid, "user_id": user_id})
-    if res.deleted_count == 0:
-        raise HTTPException(404, detail="Receta no encontrada o no te pertenece")
-
-    # 5) Devolver las recetas restantes de ese usuario
-    docs = await coll.find({"user_id": user_id}).to_list(100)
-    remaining: List[Recipe] = []
-    for doc in docs:
-        doc["id"] = str(doc.pop("_id"))
-        remaining.append(Recipe(**doc))
-
-    return remaining
-
-
-@app.put(
-    "/graphql/update_recipebyuser",
-    response_model=Recipe,
-    responses={
-        400: {"description": "Bad Request: recipe_id inválido o body vacío"},
-        401: {"description": "Unauthorized"},
-        403: {"description": "Forbidden: no eres el autor"},
-        404: {"description": "Not Found: receta no existe"}
-    },
-    status_code=status.HTTP_200_OK
-)
-async def update_recipe_by_user(request: Request):
-    # 1) Autenticación
-    try:
-        info = type("Info", (), {"context": {"request": request}})
-        user_id = get_current_user_id(info)
-    except HTTPException as e:
-        raise e
-
-    # 2) Leer recipe_id de query
-    recipe_id = request.query_params.get("recipe_id")
-    if not recipe_id:
-        raise HTTPException(400, detail="Falta el parámetro `recipe_id`")
-    try:
-        oid = ObjectId(recipe_id)
-    except Exception:
-        raise HTTPException(400, detail="`recipe_id` no es un ID válido")
-
-    # 3) Leer payload JSON
-    body = await request.json()
-    # filtrar solo campos válidos
-    allowed = {"title", "prep_time", "portions", "steps", "images", "video"}
-    update_data = {k: v for k, v in body.items() if k in allowed}
-    if not update_data:
-        raise HTTPException(400, detail="No hay campos válidos para actualizar")
-
-    coll = get_collection("recipes")
-
-    # 4) Verificar existencia y autoría
-    doc = await coll.find_one({"_id": oid})
-    if not doc:
+    # 3) Verificar receta existe
+    coll_recipes = get_collection("recipes")
+    if not await coll_recipes.find_one({"_id": oid}):
         raise HTTPException(404, detail="Receta no existe")
-    if str(doc.get("user_id", "")) != user_id:
-        raise HTTPException(403, detail="No puedes editar esta receta")
+    # 4) Autenticación
+    try:
+        info    = type("Info", (), {"context": {"request": request}})
+        user_id = get_current_user_id(info)
+    except HTTPException as e:
+        raise e
+    # 5) Evitar duplicados
+    coll_likes = get_collection("likes")
+    if await coll_likes.find_one({"recipe_id": recipe_id, "user_id": user_id}):
+        raise HTTPException(409, detail="Already liked")
+    # 6) Insertar
+    res = await coll_likes.insert_one({
+        "recipe_id":  recipe_id,
+        "user_id":    user_id,
+        "created_at": datetime.utcnow().isoformat()
+    })
+    doc = await coll_likes.find_one({"_id": res.inserted_id})
+    doc["id"] = str(doc.pop("_id"))
+    return Like(**doc)
 
-    # 5) Aplicar update
-    await coll.update_one({"_id": oid}, {"$set": update_data})
 
-    # 6) Leer y devolver actualizado
-    updated = await coll.find_one({"_id": oid})
-    updated["id"] = str(updated.pop("_id"))
-    # asegúrate de que user_id siga en el dict
-    if "user_id" not in updated:
-        updated["user_id"] = user_id
-    return Recipe(**updated)
+# — DELETE /graphql/unlike_recipe
+@app.delete(
+    "/graphql/unlike_recipe",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        400: {"description": "Bad Request: recipe_id inválido o ausente"},
+        401: {"description": "Unauthorized"},
+        404: {"description": "Not Found: like no encontrado"}
+    }
+)
+async def rest_unlike_recipe(request: Request):
+    # 1) recipe_id
+    recipe_id = request.query_params.get("recipe_id")
+    if not recipe_id:
+        raise HTTPException(400, detail="Falta el parámetro `recipe_id`")
+    # 2) validar formato
+    try:
+        _ = ObjectId(recipe_id)
+    except Exception:
+        raise HTTPException(400, detail="`recipe_id` no es un ID válido")
+    # 3) autenticación
+    try:
+        info    = type("Info", (), {"context": {"request": request}})
+        user_id = get_current_user_id(info)
+    except HTTPException as e:
+        raise e
+    # 4) borrar
+    coll_likes = get_collection("likes")
+    res = await coll_likes.delete_one({"recipe_id": recipe_id, "user_id": user_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, detail="Like not found")
+    # 5) 204 No Content
+    return
 
+
+#  GET count via /graphql/likes_count
+@app.get(
+    "/graphql/likes_count",
+    response_model=int,
+    responses={
+        400: {"description": "Bad Request: recipe_id inválido o ausente"},
+        404: {"description": "Not Found: receta no existe"}
+    }
+)
+async def rest_likes_count(recipe_id: str):
+    # 1) validar id
+    try:
+        oid = ObjectId(recipe_id)
+    except:
+        raise HTTPException(400, detail="`recipe_id` no es un ID válido")
+    # 2) existe receta?
+    coll_recipes = get_collection("recipes")
+    if not await coll_recipes.find_one({"_id": oid}):
+        raise HTTPException(404, detail="Receta no existe")
+    # 3) contar
+    coll_likes = get_collection("likes")
+    cnt = await coll_likes.count_documents({"recipe_id": recipe_id})
+    return cnt

@@ -64,11 +64,9 @@ async def get_recipes(request: Request):
     for doc in raw_docs:
         doc["id"] = str(doc.pop("_id"))
 
-        print("Identificador de receta:", doc["id"])
-
-        # Si falta user_id, asignamos un valor por defecto
-        if "user_id" not in doc:
-            doc["user_id"] = ""          # o "anonymous", o None si haces Optional
+        # Asegurar campos obligatorios
+        doc.setdefault("user_id", "")
+        doc.setdefault("description", "")  # <- Asegura que exista
 
         recipes.append(Recipe(**doc))
     return recipes
@@ -109,6 +107,7 @@ async def create_recipe(request: Request, payload: dict = Body(...)):
 
     # 2) Leer campos obligatorios y opcionales
     title     = payload.get("title")
+    description     = payload.get("description")
     prep_time = payload.get("prep_time")
     portions  = payload.get("portions")
     steps     = payload.get("steps")
@@ -122,6 +121,7 @@ async def create_recipe(request: Request, payload: dict = Body(...)):
     doc = {
         "user_id":   user_id,
         "title":     title,
+        "description": description,
         "prep_time": prep_time,
         "portions":  portions,
         "steps":     steps,

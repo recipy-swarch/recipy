@@ -6,6 +6,7 @@ export interface IRecipe {
     video?: string;
     portions: number;
     steps: string[];
+    description: string;
 }
 
 

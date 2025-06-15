@@ -15,7 +15,18 @@ from datetime import datetime
 from bson import ObjectId
 from app.schema import CommentOut, CommentWithRepliesOut
 from pydantic import BaseModel, Field
+from fastapi.middleware.cors import CORSMiddleware
 
+app = FastAPI(title="recipe-ms")
+
+# Permite peticiones desde tu UI (puedes restringir el origen en prod)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],            
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # 1. Definir el esquema
 schema = strawberry.Schema(query=Query, mutation=Mutation)
 

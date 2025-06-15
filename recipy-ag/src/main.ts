@@ -3,7 +3,7 @@ import { AppModule } from './app.module';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as bodyParser from 'body-parser';
 import axios from 'axios';                      // <-- nuevo
-
+import * as FormData from 'form-data';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -35,6 +35,15 @@ async function bootstrap() {
       target: process.env.USERAUTH_MS_URL,
       changeOrigin: true,
       pathRewrite: { '^/auth': '' , }, // quita el prefijo /auth
+    }),
+  );
+
+  // Proxy /uploads/* al servicio de imagenes
+  app.use(
+    '/uploads',
+    createProxyMiddleware({
+      target: process.env.IMAGE_API_URL,
+      changeOrigin: true,
     }),
   );
 
@@ -76,30 +85,39 @@ async function bootstrap() {
   };
 
   // 3.1. Middleware que sube imágenes a Imgur y reemplaza el array en el body
-  const processImages = async (req: any, _res: any, next: any) => {
-    try {
-      if (req.body?.images && Array.isArray(req.body.images)) {
-        console.log('Uploading images to Imgur:', req.body.images);
-        const links = await Promise.all(
-          req.body.images.map(async (img: string) => {
-            const { data } = await axios.post(
-              `${process.env.IMGUR_API_URL}/imgur/upload`,
-              { image: img }
-            );
-            console.log('Imgur response:', data);
-            return data.data.link;
-          })
-        );
-        req.body.images = links;
-        console.log('Updated images in body:', req.body.images);
-        req.rawBody = JSON.stringify(req.body);
-        console.log('Updated raw body:', req.rawBody);
-      }
-      next();
-    } catch (err) {
-      next(err);
-    }
-  };
+ const processImages = async (req: any, _res: any, next: any) => {
+   try {
+     if (req.body?.images && Array.isArray(req.body.images)) {
+       console.log('Uploading images to image-ms:', req.body.images);
+       const links = await Promise.all(
+         req.body.images.map(async (img: string, idx: number) => {
+           const form = new FormData()
+           const buffer = Buffer.from(img, 'base64')
+           // TODO: Nos va a tocar cambiar esto, porque siempre es png, además que siendo un base64, nos limitamos a archivos pequeños
+           form.append('image', buffer, { filename: `${idx + 1}.png` })
+           form.append('type', 'recipe')
+           form.append('id', req.userId ?? '0')
+
+           const { data } = await axios.post(
+             `${process.env.IMAGE_API_URL}/Image/upload`,
+             form,
+             { headers: form.getHeaders() }
+           );
+           console.log('image-ms response:', data);
+           return data.link;
+         })
+       );
+       req.body.images = links;
+       console.log('Updated images in body:', req.body.images);
+       req.rawBody = JSON.stringify(req.body);
+       console.log('Updated raw body:', req.rawBody);
+     }
+     next();
+   } catch (err) {
+     next(err);
+   }
+ };
+
 
   // 3. Proxy específico para GraphQL de recetas
   app.use(
@@ -141,6 +159,16 @@ async function bootstrap() {
           proxyReq.write(req.rawBody);
         }
       },
+    }),
+  );
+
+    // Proxy para el microservicio de correo (mail-ms)
+  app.use(
+    '/mail',
+    createProxyMiddleware({
+      target: process.env.MAIL_MS_URL,
+      changeOrigin: true,
+      pathRewrite: { '^/mail': '' }, // elimina /mail del path
     }),
   );
 

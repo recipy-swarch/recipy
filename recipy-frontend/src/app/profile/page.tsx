@@ -1,4 +1,23 @@
+"use client";
+
+import { useAuth } from "@/context/authContext";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 export default function ProfilePage() {
+  const { isLoggedIn } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      router.push("/login");
+    }
+  }, [isLoggedIn, router]);
+
+  if (!isLoggedIn) {
+    return <p>Redirigiendo a login...</p>; // mientras redirige
+  }
+
   return (
     <div className="container py-5 h-100">
       <div className="row d-flex justify-content-center">

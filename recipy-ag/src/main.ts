@@ -42,7 +42,7 @@ async function bootstrap() {
   app.use(
     '/uploads',
     createProxyMiddleware({
-      target: process.env.IMAGE_API_URL,
+      target: process.env.IMAGE_MS_URL,
       changeOrigin: true,
     }),
   );
@@ -84,7 +84,7 @@ async function bootstrap() {
     }
   };
 
-  // 3.1. Middleware que sube imágenes a Imgur y reemplaza el array en el body
+  // 3.1. Middleware que sube imágenes a Image y reemplaza el array en el body
  const processImages = async (req: any, _res: any, next: any) => {
    try {
      if (req.body?.images && Array.isArray(req.body.images)) {
@@ -99,7 +99,7 @@ async function bootstrap() {
            form.append('id', req.userId ?? '0')
 
            const { data } = await axios.post(
-             `${process.env.IMAGE_API_URL}/Image/upload`,
+             `${process.env.IMAGE_MS_URL}/Image/upload`,
              form,
              { headers: form.getHeaders() }
            );
@@ -159,6 +159,16 @@ async function bootstrap() {
           proxyReq.write(req.rawBody);
         }
       },
+    }),
+  );
+
+    // Proxy para el microservicio de correo (mail-ms)
+  app.use(
+    '/mail',
+    createProxyMiddleware({
+      target: process.env.MAIL_MS_URL,
+      changeOrigin: true,
+      pathRewrite: { '^/mail': '' }, // elimina /mail del path
     }),
   );
 

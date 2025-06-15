@@ -10,10 +10,9 @@ class UserService {
   // Lanza un error si la URL no está definida
 
   constructor() {
-    this.apiUrl = process.env.NEXT_PUBLIC_API_GATEWAY_URL || "";
-    console.log("este es mi ", this.apiUrl);
-    if (this.apiUrl === "") {
-      throw new Error("API URL is not defined");
+    this.apiUrl = process.env.API_GATEWAY_URL || "";
+    if (!this.apiUrl) {
+      throw new Error("API_GATEWAY_URL no está definido");
     }
   }
 

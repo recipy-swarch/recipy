@@ -200,7 +200,7 @@ def public_profile(user_id):
 
 
 
-@app.route("/profile", methods=["GET", "PUT"])
+@app.route("/my-profile", methods=["GET", "PUT"])
 @jwt_required()
 def profile():
     uid = get_jwt_identity()

@@ -4,9 +4,11 @@ class RecipeService {
     private apiUrl : string
 
     constructor() {
-        this.apiUrl = process.env.API_GATEWAY_URL || '' 
-        if (this.apiUrl === '') {
-            throw new Error('API URL is not defined')
+        // NEXT_PUBLIC_API_GATEWAY_URL ya está expuesta al bundle cliente
+        this.apiUrl = process.env.API_GATEWAY_URL || ''
+        console.log("API (cliente) apuntando a:", this.apiUrl)
+        if (!this.apiUrl) {
+            throw new Error('NEXT_PUBLIC_API_GATEWAY_URL no está definido')
         }
     }
     fetchAllRecipes = async (): Promise<IRecipe[]> => {

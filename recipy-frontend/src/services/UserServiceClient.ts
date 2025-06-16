@@ -22,6 +22,7 @@ class UserServiceClient {
       }
 
       const data = await response.json();
+      console.log("datos recupreados con getPublicProfile: ", data);
       return data;
     } catch (error) {
       console.error("Error in getPublicProfile:", error);

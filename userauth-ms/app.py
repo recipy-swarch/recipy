@@ -181,7 +181,6 @@ def public_profile(user_id):
         return jsonify({"error": "Usuario no encontrado"}), 404
 
     user = r.json()[0]
-
     # Retornar solo campos públicos
     public_data = {
         "id": user["id"],

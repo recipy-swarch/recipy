@@ -9,10 +9,10 @@ export default function MyProfile() {
   const [recipes, setRecipes] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
+    username: "",
     biography: "",
     location: "",
     profile_picture: [],
-    birth_date: "",
   });
 
   useEffect(() => {
@@ -25,6 +25,7 @@ export default function MyProfile() {
       if (data) {
         setUser(data);
         setFormData({
+          username: data.username || "",
           biography: data.biography || "",
           location: data.location || "",
           profile_picture: data.profile_picture || [],
@@ -147,7 +148,7 @@ export default function MyProfile() {
                         value={formData.username}
                         onChange={handleInputChange}
                         className="form-control mb-2"
-                        placeholder="Ubicación"
+                        placeholder="Username"
                       />
                       <textarea
                         name="biography"
@@ -163,6 +164,14 @@ export default function MyProfile() {
                         onChange={handleInputChange}
                         className="form-control mb-2"
                         placeholder="Ubicación"
+                      />
+                      <input
+                        type="date"
+                        name="birth_date"
+                        value={formData.birth_date}
+                        onChange={handleInputChange}
+                        className="form-control mb-2"
+                        placeholder="Fecha de nacimiento"
                       />
                       {/* Aquí podrías agregar un input para imagen si deseas */}
                       <button

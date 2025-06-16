@@ -26,7 +26,7 @@ function correr_contenedores() {
 
 function eliminar_bases_datos() {
     echo "Eliminando bases de datos..."
-    rm -rf recipe-db/data userauth-db/data userauth-db/pgdata 
+    rm -rf recipe-db/data userauth-db/data userauth-db/pgdata token-db/data
     echo "Bases de datos eliminadas."
 }
 

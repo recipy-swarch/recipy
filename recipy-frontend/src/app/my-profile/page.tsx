@@ -9,10 +9,10 @@ export default function MyProfile() {
   const [recipes, setRecipes] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    username: "",
     biography: "",
     location: "",
     profile_picture: [],
+    birth_date: "", // <-- agregar birth_date desde el inicio
   });
 
   useEffect(() => {
@@ -25,7 +25,6 @@ export default function MyProfile() {
       if (data) {
         setUser(data);
         setFormData({
-          username: data.username || "",
           biography: data.biography || "",
           location: data.location || "",
           profile_picture: data.profile_picture || [],
@@ -51,12 +50,19 @@ export default function MyProfile() {
   const handleSave = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
-    console.log("Token usado en updateMyProfile:", token);
-    console.log("FormData enviada a updateMyProfile:", formData);
-    const success = await userServiceClient.updateMyProfile(token, formData);
+
+    const payload = {
+      biography: formData.biography,
+      location: formData.location,
+      birth_date: formData.birth_date,
+      // profile_picture: formData.profile_picture,
+    };
+
+    console.log("Enviando a updateMyProfile:", payload);
+
+    const success = await userServiceClient.updateMyProfile(token, payload);
     if (success) {
-      // Actualiza el estado del usuario mostrado
-      setUser((prev) => ({ ...prev, ...formData }));
+      setUser((prev) => ({ ...prev, ...payload }));
       setIsEditing(false);
     } else {
       alert("Error al actualizar el perfil.");
@@ -137,19 +143,12 @@ export default function MyProfile() {
             </div>
 
             <div className="card-body p-4 text-black">
-              <div className="mb-5 text-body">
+              <div className="text-body">
                 <p className="lead card-title mb-1">About Me</p>
                 <div className="p-4 card-body">
+                  <p>{user.biography || "Sin descripción"}</p>
                   {isEditing ? (
                     <>
-                      <input
-                        type="text"
-                        name="username"
-                        value={formData.username}
-                        onChange={handleInputChange}
-                        className="form-control mb-2"
-                        placeholder="Username"
-                      />
                       <textarea
                         name="biography"
                         value={formData.biography}
@@ -188,21 +187,14 @@ export default function MyProfile() {
                       </button>
                     </>
                   ) : (
-                    <>
-                      <p>{user.username || "Sin descripción"}</p>
-                      <p>{user.biography || "Sin descripción"}</p>
-                      <p>Ubicación: {user.location || "No especificada"}</p>
-                      <p>
-                        Fecha de nacimiento:{" "}
-                        {user.birth_date || "No especificada"}
-                      </p>
+                    <div className="d-flex flex-column justify-content-end align-items-end">
                       <button
-                        className="btn btn-primary"
+                        className="btn d-flex flex-column justify-content-end align-items-end"
                         onClick={() => setIsEditing(true)}
                       >
                         Editar Perfil
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>

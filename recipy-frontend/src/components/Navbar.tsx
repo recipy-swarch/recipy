@@ -39,7 +39,9 @@ export default function Navbar() {
               </Link>
             </li>
             <li className="nav-item">
-              <button onClick={goToProfile}>Ir a Mi Perfil</button>
+              <button className="btn" onClick={goToProfile}>
+                my Profile
+              </button>
             </li>
             <li className="nav-item">
               <button className="btn special-btn" onClick={logout}>

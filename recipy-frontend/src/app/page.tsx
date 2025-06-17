@@ -5,7 +5,7 @@ import Link from "next/link";
 import { fetchAllRecipes } from "@/lib/actions";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import userServiceClient from "@/services/UserServiceClient";
+import { getPublicProfile } from "@/lib/profileActions";
 
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState([]);
@@ -27,15 +27,14 @@ export default function RecipesPage() {
 
   // Fetch usernames for all unique user_ids in recipes
   const fetchUsernamesForRecipes = async (recipes) => {
-    const uniqueUserIds = [...new Set(recipes.map((recipe) => recipe.user_id))];
-
-    const usernamesMap = {};
+    const uniqueUserIds = [...new Set(recipes.map((r) => r.user_id))];
+    const usernamesMap: Record<number, string> = {};
 
     await Promise.all(
       uniqueUserIds.map(async (userId) => {
         try {
-          const data = await userServiceClient.getPublicProfile(Number(userId));
-          usernamesMap[userId] = data?.username || "Desconocido";
+          const result = await getPublicProfile(userId);
+          usernamesMap[userId] = result.success ? result.profile.username : "Desconocido";
         } catch (error) {
           console.error(`Error fetching username for user ${userId}:`, error);
           usernamesMap[userId] = "Desconocido";

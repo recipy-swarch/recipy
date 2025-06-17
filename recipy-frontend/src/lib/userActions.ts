@@ -3,8 +3,6 @@
 import userService from "@/services/UserService";
 import { IUserRegister } from "@/interfaces/IUser";
 
-import userServiceClient from "@/services/UserServiceClient";
-
 export async function createUser(userData: IUserRegister) {
   try {
     console.log("Registrar usuario:", userData);

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import userService from "@/services/UserService";
-import userServiceClient from "@/services/UserServiceClient";
+import { getPublicProfile } from "@/lib/profileActions";
 import { useAuth } from "@/context/authContext";
 import Link from "next/link";
 
@@ -20,9 +19,9 @@ export default function ProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const data = await userServiceClient.getPublicProfile(Number(id));
-        console.log("Perfil recibido:", data);
-        setProfile(data);
+        const result = await getPublicProfile(Number(id));
+        const profile = result.success ? result.profile : null;
+        setProfile(profile);
       } catch (error) {
         console.error("Error fetching profile:", error);
       } finally {

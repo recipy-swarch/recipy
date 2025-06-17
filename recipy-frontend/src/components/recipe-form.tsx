@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-  import { useState, useRef, type FormEvent } from "react"
-  import { createRecipe } from "@/lib/actions"
-  import ImageUploader from "./image-uploader"
-  import DynamicList from "./dynamic-list"
+import { useState, useRef, FormEvent } from "react";
+import { createRecipe } from "@/lib/actions";
+import ImageUploader from "./image-uploader";
+import DynamicList from "./dynamic-list";
 
 export default function RecipeForm() {
   const [title, setTitle] = useState("");
@@ -20,101 +20,79 @@ export default function RecipeForm() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-
     if (!title.trim()) newErrors.title = "El título es obligatorio";
-    if (!prep_time.trim())
-      newErrors.prepTime = "El tiempo de preparación es obligatorio";
+    if (!prep_time.trim()) newErrors.prepTime = "El tiempo de preparación es obligatorio";
     if (portions < 1) newErrors.portions = "Las porciones deben ser al menos 1";
-    if (!description.trim())
-      newErrors.description = "La descripción es obligatoria";
-
+    if (!description.trim()) newErrors.description = "La descripción es obligatoria";
     if (ingredients.length === 0 || ingredients.every((i) => !i.trim())) {
       newErrors.ingredients = "Debes agregar al menos un ingrediente";
     }
-
     if (steps.length === 0 || steps.every((s) => !s.trim())) {
       newErrors.steps = "Debes agregar al menos un paso";
     }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-      setErrors(newErrors)
-      return Object.keys(newErrors).length === 0
-    }
+  const processAndConvert = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const size = 700;
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject("Error al convertir imagen");
+            const webpFile = new File(
+              [blob],
+              file.name.replace(/\.\w+$/, ".webp"),
+              { type: "image/webp" }
+            );
+            resolve(webpFile);
+            URL.revokeObjectURL(url);
+          },
+          "image/webp",
+          0.8
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject("Error cargando imagen");
+      };
+      img.src = url;
+    });
+  };
 
-    // 1) Función utilitaria para recortar a cuadrado, redimensionar y convertir a WebP
-    const processAndConvert = (file: File): Promise<File> => {
-      return new Promise((resolve, reject) => {
-        const img = new Image()
-        const url = URL.createObjectURL(file)
-        img.onload = () => {
-          const size = 700
-          // Determinar lado de la región cuadrada a recortar
-          const side = Math.min(img.width, img.height)
-          const sx = (img.width - side) / 2
-          const sy = (img.height - side) / 2
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+    setIsSubmitting(true);
 
-          const canvas = document.createElement("canvas")
-          canvas.width = size
-          canvas.height = size
-          const ctx = canvas.getContext("2d")!
-
-          // Dibujar sólo la región central cuadrada escalada a 700×700
-          ctx.drawImage(
-            img,
-            sx, sy, side, side,   // fuente: recorte cuadrado
-            0, 0, size, size      // destino: lienzo completo
-          )
-
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) return reject("Error al convertir imagen")
-              const webpFile = new File(
-                [blob],
-                file.name.replace(/\.\w+$/, ".webp"),
-                { type: "image/webp" }
-              )
-              resolve(webpFile)
-              URL.revokeObjectURL(url)
-            },
-            "image/webp",
-            0.8
-          )
-        }
-        img.onerror = (e) => {
-          URL.revokeObjectURL(url)
-          reject("Error cargando imagen")
-        }
-        img.src = url
-      })
-    }
-
-    const handleSubmit = async (e: FormEvent) => {
-      e.preventDefault()
-      if (!validateForm()) return
-      setIsSubmitting(true)
-
-      try {
-        // 2) Procesamos todas las imágenes
-        const processedImages = await Promise.all(images.map(f => processAndConvert(f)))
-
-        const formData = new FormData()
-        formData.append("title", title)
-        formData.append("prep_time", prep_time)
-        formData.append("portions", portions.toString())
-        formData.append("description", description)
-        formData.append("steps", JSON.stringify(steps.filter(s => s.trim())))
-
-        // 3) Añadimos los WebP redimensionados
-        processedImages.forEach(img => formData.append("images", img))
-
-        const token = localStorage.getItem("token")
-        if (token) await createRecipe(formData, token)
-        alert("¡Receta creada con éxito!")
-      } catch (error) {
-        console.error("Error al crear la receta:", error)
-        alert("Ocurrió un error al crear la receta.")
-      } finally {
-        setIsSubmitting(false)
-      }
+    try {
+      const processedImages = await Promise.all(images.map((f) => processAndConvert(f)));
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("prep_time", prep_time);
+      formData.append("portions", portions.toString());
+      formData.append("description", description);
+      formData.append("steps", JSON.stringify(steps.filter((s) => s.trim())));
+      processedImages.forEach((img) => formData.append("images", img));
+      const token = localStorage.getItem("token");
+      if (token) await createRecipe(formData, token);
+      alert("¡Receta creada con éxito!");
+    } catch (error) {
+      console.error("Error al crear la receta:", error);
+      alert("Ocurrió un error al crear la receta.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

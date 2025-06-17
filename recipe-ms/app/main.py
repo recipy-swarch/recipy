@@ -1,14 +1,12 @@
-from dotenv import load_dotenv
-load_dotenv()   # <- esto importa las JWT_SECRET y JWT_ALGO desde .env
-
 from strawberry.fastapi import GraphQLRouter
 import strawberry
-
+import os
+import httpx
 from app.schema import Query, Mutation, Comment, Recipe, get_current_user_id, Like
 from app.db import client, get_collection
 from app.initial_data import get_initial_recipes
-from app.data import load_initial_data  # función que pobla la lista en memoria
-from fastapi import FastAPI, Request, HTTPException, Body, status
+from app.data import load_initial_data  
+from fastapi import FastAPI, Request, HTTPException, Body, status, Response
 from typing import List
 from app.db import get_collection
 from datetime import datetime
@@ -16,6 +14,7 @@ from bson import ObjectId
 from app.schema import CommentOut, CommentWithRepliesOut
 from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI(title="recipe-ms")
 
@@ -48,6 +47,16 @@ class CommentUpdateIn(BaseModel):
 
 app = FastAPI(title="Recipe Service")
 app.include_router(graphql_app, prefix="/graphql")
+
+CACHE_API = os.getenv("CACHE_API_URL")
+_http = httpx.AsyncClient(timeout=3.0)
+
+async def cache_del(key: str):
+    # llamas al DELETE de cache-api
+    resp = await _http.delete(f"{CACHE_API}/cache/{key}")
+    # opcionalmente ignoras 404
+    if resp.status_code not in (204, 404):
+        resp.raise_for_status()
 
 # 3. Startup hook para Mongo + datos iniciales
 @app.on_event("startup")
@@ -161,6 +170,68 @@ async def create_recipe(request: Request, payload: dict = Body(...)):
     saved = await coll.find_one({"_id": res.inserted_id})
     saved["id"] = str(saved.pop("_id"))
     return Recipe(**saved)
+@app.post(
+    "/comments_recipes",
+    response_model=Comment,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_comment(
+    request: Request,
+    response: Response,
+    payload: dict = Body(...),
+):
+    # 1) Autenticación / extracción de user_id
+    try:
+        info = type("Info", (), {"context": {"request": request}})
+        user_id = get_current_user_id(info)
+    except HTTPException as e:
+        raise e
+
+    # 2) Leer y validar campos
+    recipe_id = payload.get("recipe_id")
+    content   = payload.get("content")
+    parent_id = payload.get("parent_id", None)
+
+    if not recipe_id or not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Faltan campos obligatorios: recipe_id y content",
+        )
+    # Validar recipe_id como ObjectId
+    try:
+        oid = ObjectId(recipe_id)
+    except:
+        raise HTTPException(400, "`recipe_id` no es un ID válido")
+
+    # 3) Verificar que la receta exista
+    coll_recipes = get_collection("recipes")
+    if not await coll_recipes.find_one({"_id": oid}):
+        raise HTTPException(404, "Receta no encontrada")
+
+    # 4) Insertar el comentario en Mongo
+    coll_comments = get_collection("comments")
+    doc = {
+        "recipe_id": recipe_id,
+        "user_id":   user_id,
+        "content":   content,
+        "parent_id": parent_id,
+        "created_at": datetime.utcnow(),
+    }
+    res = await coll_comments.insert_one(doc)
+
+    # 5) Leer de vuelta y mapear _id → id
+    saved = await coll_comments.find_one({"_id": res.inserted_id})
+    saved["id"] = str(saved.pop("_id"))
+
+    # 6) Invalidate cache de comments para esta receta
+    cache_key = f"recipes:comments:{recipe_id}"
+    await cache_del(cache_key)
+    response.headers["X-Cache-Invalidated"] = cache_key
+    # tras construir 'comments' como lista de dicts o Pydantic
+    await cache_set(f"recipes:comments:{recipe_id}", [c.dict() for c in comments], COMMENTS_TTL)
+    response.headers["X-Cache"] = "MISS"
+
+    return Comment(**saved)
 #obtener los comentarios de una receta
 @app.get(
     "/comments_recipes/{recipe_id}",

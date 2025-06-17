@@ -160,6 +160,17 @@ services:
     networks:
       - frontend
 
+
+  # Servicio de desarrollo para captura y testing de correos
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # UI web
+    networks:
+      - backend
+
+
   # Servicio de correo asíncrono
   mail-ms:
     build:
@@ -189,6 +200,7 @@ services:
       backend:
         aliases:
           - rabbitmq   # para tests de userauth-ms
+
 
 volumes:
   rabbitmq_data:

@@ -4,23 +4,47 @@ import styles from "./page.module.css";
 import Link from "next/link";
 import { fetchAllRecipes } from "@/lib/actions";
 import Image from "next/image";
-
 import { useEffect, useState } from "react";
+import userServiceClient from "@/services/UserServiceClient";
 
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [usernames, setUsernames] = useState({}); // { userId: username }
 
+  // Fetch recipes
   useEffect(() => {
     const getRecipes = async () => {
       const result = await fetchAllRecipes();
       if (result.success) {
         setRecipes(result.recipes);
+        await fetchUsernamesForRecipes(result.recipes);
       }
       setLoading(false);
     };
     getRecipes();
   }, []);
+
+  // Fetch usernames for all unique user_ids in recipes
+  const fetchUsernamesForRecipes = async (recipes) => {
+    const uniqueUserIds = [...new Set(recipes.map((recipe) => recipe.user_id))];
+
+    const usernamesMap = {};
+
+    await Promise.all(
+      uniqueUserIds.map(async (userId) => {
+        try {
+          const data = await userServiceClient.getPublicProfile(Number(userId));
+          usernamesMap[userId] = data?.username || "Desconocido";
+        } catch (error) {
+          console.error(`Error fetching username for user ${userId}:`, error);
+          usernamesMap[userId] = "Desconocido";
+        }
+      })
+    );
+
+    setUsernames(usernamesMap);
+  };
 
   if (loading) return <div>Cargando recetas...</div>;
 
@@ -71,14 +95,14 @@ export default function RecipesPage() {
                   >
                     {recipe.title}
                   </Link>
-                  <div className=".card-body mb-1 d-flex justify-content-between">
+                  <div className="card-body mb-1 d-flex justify-content-between">
                     <p>
                       Publicado por:{" "}
                       <Link
                         style={{ color: "#DDBCE5" }}
                         href={`/profile/${recipe.user_id}`}
                       >
-                        {recipe.user_id}
+                        {usernames[recipe.user_id] || "Cargando..."}
                       </Link>
                     </p>
                     <p>
@@ -86,7 +110,7 @@ export default function RecipesPage() {
                     </p>
                   </div>
                   <p
-                    className=".card-body"
+                    className="card-body"
                     style={{
                       display: "-webkit-box",
                       WebkitLineClamp: 4,

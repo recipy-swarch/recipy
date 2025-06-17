@@ -14,20 +14,50 @@ services:
       - .env
     networks:
       - frontend
-
   # Recipe micro-service (FastAPI/Uvicorn)
   recipe-ms:
     build:
       context: ./recipe-ms
       dockerfile: Dockerfile
+    container_name: recipe-ms
     ports:
       - "8000:8000"
     volumes:
       - ./recipe-ms/app:/app/app
     env_file:
-      - .env # <— esto carga JWT_SECRET y JWT_ALGO en recipe-ms
+      - .env
     depends_on:
       - recipe-db
+      - recipy-cache
+    networks:
+      - backend
+
+  # Redis para cache
+  recipy-cache:
+    image: redis:7
+    container_name: recipy-cache
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend
+
+  # API que expone cache sobre Redis
+  recipe-cache:
+    build:
+      context: ./recipy-cache
+      dockerfile: Dockerfile
+    container_name: recipe-cache-api
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    depends_on:
+      - recipy-cache
     networks:
       - backend
 
@@ -61,6 +91,28 @@ services:
     networks:
       - backend
 
+# PostgreSQL for userauth-tokens
+  token-db:
+    build:
+      context: ./token-db
+      dockerfile: Dockerfile
+    container_name: token-db
+    restart: always
+    env_file:
+      - .env
+    environment:
+      # Estas tres variables son las que usa postgres:17.5-alpine para crear la BD
+      POSTGRES_USER:   ${TOKEN_DB_USER}
+      POSTGRES_PASSWORD: ${TOKEN_DB_PASSWORD}
+      POSTGRES_DB:     ${TOKEN_DB_NAME}
+    volumes:
+      - ./token-db/data:/var/lib/postgresql/data
+      - ./token-db/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5433:5432"
+    networks:
+      - backend
+
   # PostgREST for user-auth
   userauth-postgrest:
     image: postgrest/postgrest:v13.0.0
@@ -90,6 +142,7 @@ services:
       - "5000:5000"   
     depends_on:
       - userauth-postgrest
+      - token-db
     networks:
       - backend
 
@@ -108,16 +161,80 @@ services:
       - backend
       - frontend
   
-  # Imgur API endpoint
-  imgur-api:
+  # Image MS (ASP.NET Core Web API)
+  image-ms:
     build:
-      context: ./imgur-api
+      context: ./image-ms
     env_file:
       - .env
     ports:
       - "8080:8080"
+    volumes:
+      - ./image-ms/uploads:/app/wwwroot/uploads
     networks:
       - backend
+
+  recipy-rp:
+    image: nginx:alpine
+    container_name: recipy-rp
+    volumes:
+      - ./recipy-rp/default.conf.template:/etc/nginx/conf.d/default.conf.template
+      - ./recipy-rp/entrypoint.sh:/entrypoint.sh
+    ports:
+      - "80:80"
+    env_file:
+      - .env
+    entrypoint: ["/entrypoint.sh"]
+    #depends_on:
+    #  - recipy-ag
+    networks:
+      - frontend
+
+
+  # Servicio de desarrollo para captura y testing de correos
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # UI web
+    networks:
+      - backend
+
+
+  # Servicio de correo asíncrono
+  mail-ms:
+    build:
+      context: ./mail-ms
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8080"
+    env_file:
+      - .env      # Carga MAIL_SMTP_* y AMQP_URL
+    depends_on:
+      - mail-broker
+    networks:
+      - backend
+    restart: always
+
+  # Broker de mensajes (RabbitMQ)
+  mail-broker:
+    image: rabbitmq:3-management
+    container_name: mail-broker
+    restart: always
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      backend:
+        aliases:
+          - rabbitmq   # para tests de userauth-ms
+
+
+volumes:
+  rabbitmq_data:
+  redis-data:
 
 networks:
   frontend:

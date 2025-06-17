@@ -57,44 +57,14 @@ class RecipeService {
         return data as IRecipe[];
         };
 
-    // Helper que lee un File y devuelve sólo el payload Base64
-    private async readFileAsBase64(file: File): Promise<string> {
-        const arrayBuffer = await file.arrayBuffer();
-        return Buffer.from(arrayBuffer).toString('base64');
-    }
-
-    private async formDataToJson(formData: FormData) {
-        const obj: any = {};
-        const images: string[] = [];
-        for (const [key, val] of formData.entries()) {
-            if (val instanceof File) {
-                images.push(await this.readFileAsBase64(val));
-            } else {
-                obj[key] = val;
-            }
-        }
-        // El Gateway espera un campo `images: string[]`
-        if (images.length) obj.images = images;
-        // parsea steps si viene como JSON string
-        if (typeof obj.steps === 'string') {
-            try { obj.steps = JSON.parse(obj.steps); } catch {}
-        }
-        return obj;
-    }
-
     createRecipe = async (formData: FormData, token: string): Promise<IRecipe> => {
-        const dataObj = await this.formDataToJson(formData);
-        console.log("Body JSON listo:", dataObj);
         const res = await fetch(`${this.apiUrl}/recipe/graphql/create_recipe`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify(dataObj),
+            body: formData, // el navegador añade multipart/form-data con boundary
         });
-
-        console.log("Response:", res);
 
         if (!res.ok) {
             const text = await res.text();
@@ -103,7 +73,6 @@ class RecipeService {
         }
 
         const data_r = await res.json();
-
         if (data_r.error) {
             console.error('Error creating recipe:', data_r.error);
             throw new Error(`Error ${data_r.error}`);
@@ -111,8 +80,6 @@ class RecipeService {
 
         return data_r as IRecipe;
     };
-
-    
 }
 
 const recipeService = new RecipeService()

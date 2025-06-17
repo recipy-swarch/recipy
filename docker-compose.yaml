@@ -79,7 +79,7 @@ services:
       - ./token-db/data:/var/lib/postgresql/data
       - ./token-db/initdb:/docker-entrypoint-initdb.d:ro
     ports:
-      - "5438:5432"
+      - "5433:5432"
     networks:
       - backend
 

@@ -14,20 +14,50 @@ services:
       - .env
     networks:
       - frontend
-
   # Recipe micro-service (FastAPI/Uvicorn)
   recipe-ms:
     build:
       context: ./recipe-ms
       dockerfile: Dockerfile
+    container_name: recipe-ms
     ports:
       - "8000:8000"
     volumes:
       - ./recipe-ms/app:/app/app
     env_file:
-      - .env # <— esto carga JWT_SECRET y JWT_ALGO en recipe-ms
+      - .env
     depends_on:
       - recipe-db
+      - recipy-cache
+    networks:
+      - backend
+
+  # Redis para cache
+  recipy-cache:
+    image: redis:7
+    container_name: recipy-cache
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend
+
+  # API que expone cache sobre Redis
+  recipe-cache:
+    build:
+      context: ./recipy-cache
+      dockerfile: Dockerfile
+    container_name: recipe-cache-api
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    depends_on:
+      - recipy-cache
     networks:
       - backend
 
@@ -204,6 +234,7 @@ services:
 
 volumes:
   rabbitmq_data:
+  redis-data:
 
 networks:
   frontend:

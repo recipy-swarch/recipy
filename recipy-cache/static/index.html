@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recipe-Cache & Recipe-MS UI</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 2rem auto; }
+    h1 { text-align: center; }
+    label { display: block; margin-top: 1rem; }
+    input, textarea, select, button { width: 100%; padding: 0.5rem; margin-top: 0.5rem; }
+    pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Recipe-Cache & Recipe-MS UI</h1>
+
+  <label for="service">Service:</label>
+  <select id="service">
+    <option value="cache">Cache API (port 8001)</option>
+    <option value="recipes">Recipe-MS API (port 8000)</option>
+  </select>
+
+  <label for="endpoint">Endpoint:</label>
+  <select id="endpoint">
+    <optgroup label="Cache API">
+      <option value="get-health">GET /health</option>
+      <option value="post-cache">POST /cache</option>
+      <option value="get-cache-key">GET /cache/{key}</option>
+      <option value="delete-cache-key">DELETE /cache/{key}</option>
+    </optgroup>
+    <optgroup label="Recipe-MS (REST)">
+      <option value="get-recipes">GET /recipes</option>
+      <option value="get-recipes-id">GET /recipes/{id}</option>
+      <option value="get-comments">GET /comments_recipes/{recipe_id}</option>
+      <option value="delete-comments">DELETE /comments_recipes/{recipe_id}</option>
+    </optgroup>
+    <optgroup label="Recipe-MS (GraphQL)">
+      <option value="get-graphql-recipes">GET /graphql/get_recipes</option>
+    </optgroup>
+  </select>
+
+  <div id="inputs">
+    <label id="label-key" for="key">Key / ID:</label>
+    <input type="text" id="key" placeholder="e.g. recipes:comments:684... or recipeId" />
+
+    <label id="label-value" for="value">Value (JSON):</label>
+    <textarea id="value" rows="4" placeholder='e.g. [{"foo":"bar"}]'></textarea>
+
+    <label id="label-ttl" for="ttl">TTL (seconds):</label>
+    <input type="number" id="ttl" placeholder="60" />
+  </div>
+
+  <button id="sendBtn">Send Request</button>
+
+  <h2>Response</h2>
+  <pre id="response"></pre>
+
+  <script>
+    const cacheAPI = "http://localhost:8001";
+    const recipeAPI = "http://localhost:8000";
+    const serviceSelect = document.getElementById('service');
+    const endpointSelect = document.getElementById('endpoint');
+    const keyInput = document.getElementById('key');
+    const valueInput = document.getElementById('value');
+    const ttlInput = document.getElementById('ttl');
+    const sendBtn = document.getElementById('sendBtn');
+    const responsePre = document.getElementById('response');
+
+    function updateForm() {
+      const ep = endpointSelect.value;
+      // Show key for endpoints needing {key} or {id}
+      const showKey = ['get-cache-key','delete-cache-key','get-recipes-id','get-comments','delete-comments'].includes(ep);
+      document.getElementById('label-key').style.display = showKey ? 'block' : 'none';
+      keyInput.style.display = showKey ? 'block' : 'none';
+
+      // Show value & ttl only for POST /cache
+      const showValue = ep === 'post-cache';
+      document.getElementById('label-value').style.display = showValue ? 'block' : 'none';
+      valueInput.style.display = showValue ? 'block' : 'none';
+
+      const showTtl = ep === 'post-cache';
+      document.getElementById('label-ttl').style.display = showTtl ? 'block' : 'none';
+      ttlInput.style.display = showTtl ? 'block' : 'none';
+    }
+
+    serviceSelect.addEventListener('change', updateForm);
+    endpointSelect.addEventListener('change', updateForm);
+    updateForm();
+
+    sendBtn.addEventListener('click', async () => {
+      const svc = serviceSelect.value;
+      const ep = endpointSelect.value;
+      let url = '';
+      let options = {};
+
+      switch(ep) {
+        case 'get-health':
+          url = `${cacheAPI}/health`;
+          options = { method: 'GET' };
+          break;
+        case 'post-cache':
+          url = `${cacheAPI}/cache`;
+          options = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: keyInput.value, value: JSON.parse(valueInput.value), ttl: Number(ttlInput.value) })
+          };
+          break;
+        case 'get-cache-key':
+          url = `${cacheAPI}/cache/${encodeURIComponent(keyInput.value)}`;
+          options = { method: 'GET' };
+          break;
+        case 'delete-cache-key':
+          url = `${cacheAPI}/cache/${encodeURIComponent(keyInput.value)}`;
+          options = { method: 'DELETE' };
+          break;
+        case 'get-recipes':
+          url = `${recipeAPI}/graphql/get_recipes`;
+          options = { method: 'GET' };
+          break;
+        case 'get-recipes-id':
+          url = `${recipeAPI}/graphql/get_recipebyuser/${encodeURIComponent(keyInput.value)}`;
+          options = { method: 'GET' };
+          break;
+        case 'get-comments':
+          url = `${recipeAPI}/comments_recipes/${encodeURIComponent(keyInput.value)}`;
+          options = { method: 'GET' };
+          break;
+        case 'delete-comments':
+          url = `${recipeAPI}/comments_recipes/${encodeURIComponent(keyInput.value)}`;
+          options = { method: 'DELETE' };
+          break;
+        case 'get-graphql-recipes':
+          url = `${recipeAPI}/graphql/get_recipes`;
+          options = { method: 'GET' };
+          break;
+        default:
+          return;
+      }
+
+      try {
+        const res = await fetch(url, options);
+
+        // Si es JSON, parsea y pretty-print
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const data = await res.json();
+          responsePre.textContent = `${res.status} ${res.statusText}\n\n` 
+                                    + JSON.stringify(data, null, 2);
+        } else {
+          const text = await res.text();
+          responsePre.textContent = `${res.status} ${res.statusText}\n\n${text}`;
+        }
+      } catch (err) {
+        responsePre.textContent = 'Error: ' + err;
+      }
+    });
+  </script>
+</body>
+</html>

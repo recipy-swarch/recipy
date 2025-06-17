@@ -4,6 +4,19 @@ from datetime import datetime
 from bson import ObjectId
 from app.db import get_collection
 from fastapi import HTTPException, Request
+from pydantic import BaseModel, Field
+from typing import List, Optional
+
+class CommentOut(BaseModel):
+    id: str
+    recipe_id: str = Field(..., alias="recipe_id")
+    user_id: str   = Field(..., alias="user_id")
+    content: str
+    parent_id: Optional[str]    = Field(None, alias="parent_id")
+    created_at: str             = Field(..., alias="created_at")
+
+class CommentWithRepliesOut(CommentOut):
+    replies: List[CommentOut]
 
 # ————————————————
 # Helper de Auth
@@ -52,12 +65,33 @@ class Comment:
     parent_id: Optional[str]
     created_at: str
 
+    @strawberry.field
+    async def replies(self) -> List["Comment"]:
+        coll = get_collection("comments")
+        raw = await coll.find({"parent_id": self.id}).to_list(100)
+        out: List[Comment] = []
+        for doc in raw:
+            # 1) Mapea el _id
+            doc["id"] = str(doc.pop("_id"))
+            doc.setdefault("recipe_id", self.recipe_id)
+            doc.setdefault("user_id", "")
+            doc.setdefault("parent_id", doc.get("parent_id"))
+            doc.setdefault("created_at", "")
+            #  finalmente construye el Comment
+            out.append(Comment(**doc))
+        return out
+
+
 @strawberry.type
 class Like:
     id: str
     recipe_id: str
     user_id: str
     created_at: str
+
+@strawberry.type
+class LikeCount:
+    count: int
 
 # -------------------------
 # Resolutores de consulta
@@ -98,16 +132,7 @@ class Query:
             comments.append(Comment(**doc))
         return comments
 
-    @strawberry.field
-    async def replies(self, comment_id: str) -> List[Comment]:
-        coll = get_collection("comments")
-        raw = await coll.find({"parent_id": comment_id}).to_list(50)
-        replies: List[Comment] = []
-        for doc in raw:
-            doc["id"] = str(doc.pop("_id"))
-            replies.append(Comment(**doc))
-        return replies
-
+    # Lista de likes para una receta
     @strawberry.field
     async def likes(self, recipe_id: str) -> List[Like]:
         coll = get_collection("likes")
@@ -117,6 +142,13 @@ class Query:
             doc["id"] = str(doc.pop("_id"))
             likes.append(Like(**doc))
         return likes
+
+    # (Opcional) Sólo el conteo de likes
+    @strawberry.field
+    async def likesCount(self, recipe_id: str) -> LikeCount:
+        coll = get_collection("likes")
+        cnt = await coll.count_documents({"recipe_id": recipe_id})
+        return LikeCount(count=cnt)
 
     @strawberry.field
     async def recipes_by_user(self, user_id: str) -> List[Recipe]:
@@ -193,15 +225,75 @@ class Mutation:
         doc = await coll.find_one({"_id": res.inserted_id})
         doc["id"] = str(doc.pop("_id"))
         return Comment(**doc)
-
     @strawberry.mutation
-    async def like_recipe(self, info, recipe_id: str) -> Like:
+    async def delete_comment(
+        self,
+        info,
+        comment_id: str
+    ) -> bool:
+        user_id = get_current_user_id(info)
+
+        # 1) Validar ID
+        try:
+            oid = ObjectId(comment_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="`comment_id` inválido")
+
+        coll = get_collection("comments")
+        # 2) Intentar borrar solo si coincide user_id
+        res = await coll.delete_one({"_id": oid, "user_id": user_id})
+        if res.deleted_count == 0:
+            # o no existe o no eres autor
+            raise HTTPException(status_code=404, detail="Comentario no encontrado o no tienes permiso")
+
+        return True
+    @strawberry.mutation
+    async def update_comment(
+        self,
+        info,
+        comment_id: str,
+        content: str
+    ) -> Comment:
+        user_id = get_current_user_id(info)
+
+        # 1) Validar ID
+        try:
+            oid = ObjectId(comment_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="`comment_id` inválido")
+
+        coll = get_collection("comments")
+        # 2) Recuperar el comentario
+        doc = await coll.find_one({"_id": oid})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Comentario no existe")
+        # 3) Verificar autoría
+        if doc.get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="No puedes editar este comentario")
+
+        # 4) Actualizar el contenido y la fecha (opcional)
+        await coll.update_one(
+            {"_id": oid},
+            {"$set": {
+                "content": content,
+                # podrías también actualizar un campo `updated_at`: datetime.utcnow().isoformat()
+            }}
+        )
+
+        # 5) Leer de vuelta y devolver
+        updated = await coll.find_one({"_id": oid})
+        updated["id"] = str(updated.pop("_id"))
+        return Comment(**updated)
+
+    # Dar like
+    @strawberry.mutation
+    async def likeRecipe(self, info, recipe_id: str) -> Like:
         user_id = get_current_user_id(info)
         coll = get_collection("likes")
-        # evitar duplicados opcional
-        existing = await coll.find_one({"recipe_id": recipe_id, "user_id": user_id})
-        if existing:
+        # 1) Evitar duplicados
+        if await coll.find_one({"recipe_id": recipe_id, "user_id": user_id}):
             raise HTTPException(status_code=409, detail="Already liked")
+        # 2) Insertar
         res = await coll.insert_one({
             "recipe_id": recipe_id,
             "user_id": user_id,
@@ -210,3 +302,13 @@ class Mutation:
         doc = await coll.find_one({"_id": res.inserted_id})
         doc["id"] = str(doc.pop("_id"))
         return Like(**doc)
+
+    # Quitar like
+    @strawberry.mutation
+    async def unlikeRecipe(self, info, recipe_id: str) -> bool:
+        user_id = get_current_user_id(info)
+        coll = get_collection("likes")
+        res = await coll.delete_one({"recipe_id": recipe_id, "user_id": user_id})
+        if res.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Like not found")
+        return True

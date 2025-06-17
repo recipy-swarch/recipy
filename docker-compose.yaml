@@ -144,6 +144,22 @@ services:
     networks:
       - backend
 
+  recipy-rp:
+    image: nginx:alpine
+    container_name: recipy-rp
+    volumes:
+      - ./recipy-rp/default.conf.template:/etc/nginx/conf.d/default.conf.template
+      - ./recipy-rp/entrypoint.sh:/entrypoint.sh
+    ports:
+      - "80:80"
+    env_file:
+      - .env
+    entrypoint: ["/entrypoint.sh"]
+    #depends_on:
+    #  - recipy-ag
+    networks:
+      - frontend
+
   # Servicio de correo asíncrono
   mail-ms:
     build:

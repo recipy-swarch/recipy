@@ -2,11 +2,13 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as bodyParser from 'body-parser';
-import axios from 'axios';                      // <-- nuevo
-
+import axios from 'axios';
+import * as FormData from 'form-data';
+import * as multer from 'multer';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const upload = multer({ storage: multer.memoryStorage() });
 
   // Proxy /user/* al servicio de usuarios (se quita el prefijo /user)
   app.use(
@@ -35,6 +37,15 @@ async function bootstrap() {
       target: process.env.USERAUTH_MS_URL,
       changeOrigin: true,
       pathRewrite: { '^/auth': '' , }, // quita el prefijo /auth
+    }),
+  );
+
+  // Proxy /uploads/* al servicio de imagenes
+  app.use(
+    '/uploads',
+    createProxyMiddleware({
+      target: process.env.IMAGE_MS_URL,
+      changeOrigin: true,
     }),
   );
 
@@ -75,51 +86,58 @@ async function bootstrap() {
     }
   };
 
-  // 3.1. Middleware que sube imágenes a Imgur y reemplaza el array en el body
-  const processImages = async (req: any, _res: any, next: any) => {
-    try {
-      if (req.body?.images && Array.isArray(req.body.images)) {
-        console.log('Uploading images to Imgur:', req.body.images);
-        const links = await Promise.all(
-          req.body.images.map(async (img: string) => {
-            const { data } = await axios.post(
-              `${process.env.IMGUR_API_URL}/imgur/upload`,
-              { image: img }
-            );
-            console.log('Imgur response:', data);
-            return data.data.link;
-          })
-        );
-        req.body.images = links;
-        console.log('Updated images in body:', req.body.images);
-        req.rawBody = JSON.stringify(req.body);
-        console.log('Updated raw body:', req.rawBody);
-      }
-      next();
-    } catch (err) {
-      next(err);
+  // 2. Middleware para extraer archivos multipart
+  const processMultipartImages = async (req: any, _res: any, next: any) => {
+    // soportar tanto upload.array(...) (req.files como array)
+    // como upload.fields([{ name: 'images' }]) (req.files.images como array)
+    const files: any[] = Array.isArray(req.files)
+      ? (req.files as any[])
+      : ((req.files as { images?: any[] })?.images || []);
+
+    if (files.length) {
+      console.log('Uploading images to image-ms (multipart):');
+      const links = await Promise.all(
+        files.map(async file => {
+          const form = new FormData();
+          form.append('image', file.buffer, file.originalname);
+          form.append('type', 'recipe');
+          form.append('id', req.userId ?? '0');
+          
+          const { data } = await axios.post(
+            `${process.env.IMAGE_MS_URL}/Image/upload`,
+            form,
+            { headers: form.getHeaders() }
+          );
+          return data.link;
+        })
+      );
+      // Reemplazo en el body para GraphQL
+      req.body.images = links;
+      req.rawBody = JSON.stringify(req.body);
     }
+    next();
   };
 
-  // 3. Proxy específico para GraphQL de recetas
+  // 3. Pipeline para /recipe
   app.use(
     '/recipe',
     // Log the original request body and headers before any modification
     (req: any, _res: any, next: any) => {
       console.log('--- [RECIPE] Incoming request ---');
       console.log('Headers:', req.headers);
-      console.log('Body:', req.body);
+      //console.log('Body:', req.body);
       next();
     },
-    addUserIdHeader,  // <-- primero obtenemos el id
-    jsonParser,       // <-- luego el raw body
-    processImages,    // <-- subimos imágenes y actualizamos req.rawBody
+    addUserIdHeader,               // <-- idem
+    upload.fields([{ name: 'images', maxCount: 10 }]),  // declaras el campo exacto
+    processMultipartImages,        // <-- sube a image-ms con multipart
+    jsonParser,                    // <-- preservamos rawBody en JSON para el resto
     // Log the modified request body and headers after all modifications
     (req: any, _res: any, next: any) => {
       console.log('--- [RECIPE] Modified request ---');
       console.log('Headers:', req.headers);
-      console.log('Body:', req.body);
-      console.log('RawBody:', req.rawBody);
+      //console.log('Body:', req.body);
+      //console.log('RawBody:', req.rawBody);
       next();
     },
     createProxyMiddleware({
@@ -141,6 +159,16 @@ async function bootstrap() {
           proxyReq.write(req.rawBody);
         }
       },
+    }),
+  );
+
+    // Proxy para el microservicio de correo (mail-ms)
+  app.use(
+    '/mail',
+    createProxyMiddleware({
+      target: process.env.MAIL_MS_URL,
+      changeOrigin: true,
+      pathRewrite: { '^/mail': '' }, // elimina /mail del path
     }),
   );
 

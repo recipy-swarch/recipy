@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+redis>=4.4.0
+python-dotenv
+jinja2

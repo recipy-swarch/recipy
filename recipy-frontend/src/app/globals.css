@@ -2,6 +2,7 @@
   /* main colors */
   --background: #2E2127;
   --nav-fot: #201A1D;
+  --footer: #100d0f;
   /* text colors */
   --title: #DDBCE5;
   --text: #FFFFFF;
@@ -92,10 +93,11 @@ a {
   background-color: var(--main-button);
   color: var(--main-button-text);
   border-color: none;
-  padding: 0;
+  padding:.75rem 1rem;
 
   a {
     color: var(--main-button-text);
+    padding: 0;
   }
 }
 

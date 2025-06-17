@@ -109,16 +109,32 @@ def register():
                 abort(500, "User created but lookup failed")
             user_id = lookup.json()[0]["id"]
 
-        # ahora publicamos el evento
-        conn_params = pika.BlockingConnection(params)
-        ch = conn_params.channel()
-        ch.queue_declare(queue="emails")
-        ch.basic_publish(
-            exchange="",
-            routing_key="emails",
-            body=json.dumps({"type": "welcome", "user_id": user_id})
-        )
-        conn_params.close()
+        # Disparamos correo de bienvenida vía RabbitMQ a mail-ms
+        try:
+            conn_params = pika.BlockingConnection(params)
+            ch = conn_params.channel()
+            # mail-ms escucha en la cola "send-email"
+            ch.queue_declare(queue="send-email", durable=True)
+            # Formar mensaje según EmailMessage en mail-ms
+            email_msg = {
+                "to":    data["email"],
+                "subject": "¡Bienvenido a Recipy!",
+                "body":    f"Hola {data['name']},<br><br>Gracias por registrarte en Recipy."
+            }
+            ch.basic_publish(
+                exchange="",
+                routing_key="send-email",
+                body=json.dumps(email_msg),
+                properties=pika.BasicProperties(
+                    delivery_mode=2  # mensaje persistente
+                )
+            )
+        except Exception as e:
+            app.logger.error(f"No se pudo encolar correo de bienvenida: {e}")
+        finally:
+            try: conn_params.close()
+            except: pass
+
         return jsonify({"message": "User registered"}), 201
 
     # 5. Manejo de claves duplicadas (username o email ya existe)

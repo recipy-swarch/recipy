@@ -121,6 +121,14 @@ class RecipeService {
     });
 
     console.log("Response:", res);
+    createRecipe = async (formData: FormData, token: string): Promise<IRecipe> => {
+        const res = await fetch(`${this.apiUrl}/recipe/graphql/create_recipe`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData, // el navegador añade multipart/form-data con boundary
+        });
 
     if (!res.ok) {
       const text = await res.text();
@@ -128,15 +136,14 @@ class RecipeService {
       throw new Error(`Error ${res.status}`);
     }
 
-    const data_r = await res.json();
+        const data_r = await res.json();
+        if (data_r.error) {
+            console.error('Error creating recipe:', data_r.error);
+            throw new Error(`Error ${data_r.error}`);
+        }
 
-    if (data_r.error) {
-      console.error("Error creating recipe:", data_r.error);
-      throw new Error(`Error ${data_r.error}`);
-    }
-
-    return data_r as IRecipe;
-  };
+        return data_r as IRecipe;
+    };
 }
 
 const recipeService = new RecipeService();

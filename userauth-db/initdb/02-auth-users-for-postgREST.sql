@@ -42,22 +42,20 @@ CREATE OR REPLACE FUNCTION recipy.register_user(
     _name     TEXT,
     _password TEXT,
     _username TEXT
-) RETURNS VOID
+) RETURNS TABLE(id INT)
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+    RETURN QUERY
     INSERT INTO recipy.users(
-        name,
-        email,
-        username,
-        password_hash
-    ) VALUES (
-        _name,
-        _email,
-        _username,
+        name, email, username, password_hash
+    )
+    VALUES (
+        _name, _email, _username,
         crypt(_password, gen_salt('bf'))
-    );
+    )
+    RETURNING users.id;
 END;
 $$;
 

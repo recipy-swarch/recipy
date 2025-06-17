@@ -82,6 +82,38 @@ async def on_startup():
     load_initial_data()
     print("Datos iniciales cargados en memoria.")
 
+
+@app.get("/graphql/get_recipebyuserNA", response_model=List[Recipe])
+async def get_recipes_by_userNA(request: Request):
+    # 1) Leer user_id de query params en lugar de headers
+    user_id = request.query_params.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe indicar `user_id` como parámetro de consulta"
+        )
+
+
+    # 2) Consultar Mongo por ese user_id
+    coll = get_collection("recipes")
+    raw_docs = await coll.find({"user_id": user_id}).to_list(100)
+
+
+    # 3) Mapear ObjectId → id y asegurar description/user_id
+    recipes: List[Recipe] = []
+    for doc in raw_docs:
+        doc["id"] = str(doc.pop("_id"))
+        doc.setdefault("description", "")
+        doc.setdefault("user_id", user_id)
+        recipes.append(Recipe(**doc))
+
+
+    return recipes
+
+
+
+
+
 @app.get("/graphql/get_recipes", response_model=List[Recipe])
 async def get_recipes(request: Request):
     coll = get_collection("recipes")

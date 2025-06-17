@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import userServiceClient from "@/services/UserServiceClient";
+import { getMyProfile, updateMyProfile } from "@/lib/profileActions";
 import { fetchUserRecipes } from "@/lib/actions";
 
 export default function MyProfile() {
@@ -21,7 +21,11 @@ export default function MyProfile() {
       console.log("Token usado en fetchMyProfile:", token);
       if (!token) return console.error("No hay token disponible.");
 
-      const data = await userServiceClient.getMyProfile(token);
+     const result = await getMyProfile(token);
+     const data = result.success ? result.me : null;
+     if (!result.success) {
+       console.error("No se pudo obtener el perfil:", result.error);
+     }
       if (data) {
         setUser(data);
         setFormData({
@@ -60,7 +64,8 @@ export default function MyProfile() {
 
     console.log("Enviando a updateMyProfile:", payload);
 
-    const success = await userServiceClient.updateMyProfile(token, payload);
+   const updateResult = await updateMyProfile(token, payload);
+   const success = updateResult.success;
     if (success) {
       setUser((prev) => ({ ...prev, ...payload }));
       setIsEditing(false);

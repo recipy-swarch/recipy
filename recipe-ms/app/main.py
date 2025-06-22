@@ -1,25 +1,40 @@
-from strawberry.fastapi import GraphQLRouter
-import strawberry
 import os
-import httpx
-from app.schema import Query, Mutation, Comment, Recipe, get_current_user_id, Like
+import json
+from datetime import datetime
+from typing import List
+
+from dotenv import load_dotenv
+import strawberry
+from strawberry.fastapi import GraphQLRouter
+from fastapi import FastAPI, Request, Response, HTTPException, Body, status
+from pydantic import BaseModel, Field
+from bson import ObjectId
+
+from app.schema import (
+    Query,
+    Mutation,
+    Comment,
+    Recipe,
+    Like,
+    get_current_user_id,
+    CommentOut,
+    CommentWithRepliesOut,
+)
 from app.db import client, get_collection
 from app.initial_data import get_initial_recipes
-from app.data import load_initial_data  
-from fastapi import FastAPI, Request, HTTPException, Body, status, Response
-from typing import List
-from app.db import get_collection
-from datetime import datetime
-from bson import ObjectId
-from app.schema import CommentOut, CommentWithRepliesOut
-from pydantic import BaseModel, Field
-from app.cache_client import cache_get, cache_set,cache_del
+from app.data import load_initial_data
 from app.utils import prepare_recipes
+from app.cache_client import cache_get, cache_set, cache_del
 
+# Carga variables de entorno
+load_dotenv()
+
+# TTLs para los distintos caches
+FEED_CACHE_TTL = int(os.getenv("FEED_CACHE_TTL", 60))
+COMMENTS_TTL   = int(os.getenv("COMMENTS_TTL", FEED_CACHE_TTL))
+
+# 1. Definir el esquema GraphQL
 app = FastAPI(title="recipe-ms")
-COMMENTS_TTL = int(os.getenv("FEED_CACHE_TTL", 60))
-
-# 1. Definir el esquema
 schema = strawberry.Schema(query=Query, mutation=Mutation)
 
 # 2. Definimos un context_getter tipado para que FastAPI inyecte Request

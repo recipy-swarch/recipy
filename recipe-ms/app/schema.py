@@ -1,15 +1,11 @@
-import os
-import httpx
-from fastapi import HTTPException, Request
 import strawberry
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
 from app.db import get_collection
+from fastapi import HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional
-
-API_GATEWAY = os.getenv("API_GATEWAY_URL", "http://recipy-ag:3030")
 
 class CommentOut(BaseModel):
     id: str
@@ -28,23 +24,10 @@ class CommentWithRepliesOut(CommentOut):
 
 def get_current_user_id(info) -> str:
     req = info.context["request"]
-    auth: str = req.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authentication required")
-    token = auth.split(" ", 1)[1]
-
-    # 1) Llamada a /auth/validate
-    resp = httpx.get(
-        f"{API_GATEWAY}/auth/validate",
-        headers={"Authorization": f"Bearer {token}"}, timeout=3.0
-    )
-    if resp.status_code != 200:
-        # pasamos el error
-        detail = resp.json().get("error", "Invalid token")
-        raise HTTPException(status_code=401, detail=detail)
-
-    data = resp.json()
-    return str(data["user_id"])
+    user_id = req.headers.get("id")
+    if user_id:
+        return str(user_id)
+    raise HTTPException(status_code=401, detail="Authentication required")
 
 # -------------------------
 # Tipos de dominio

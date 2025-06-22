@@ -46,8 +46,9 @@ HEADERS = {"Content-Type": "application/json"}
 
 # 6) Configuración de JWT
 app.config['JWT_SECRET_KEY'] = os.getenv("JWT_SECRET", "change-me")
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(seconds=60)
-
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(
+    hours=int(os.getenv("JWT_EXP_HOURS", "24"))
+)
 jwt = JWTManager(app)
 
 

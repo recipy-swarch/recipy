@@ -1,40 +1,26 @@
-import os
-import json
-from datetime import datetime
-from typing import List
-
-from dotenv import load_dotenv
-import strawberry
 from strawberry.fastapi import GraphQLRouter
-from fastapi import FastAPI, Request, Response, HTTPException, Body, status
-from pydantic import BaseModel, Field
-from bson import ObjectId
-
-from app.schema import (
-    Query,
-    Mutation,
-    Comment,
-    Recipe,
-    Like,
-    get_current_user_id,
-    CommentOut,
-    CommentWithRepliesOut,
-)
+import strawberry
+import os
+import httpx
+from app.schema import Query, Mutation, Comment, Recipe, get_current_user_id, Like
 from app.db import client, get_collection
 from app.initial_data import get_initial_recipes
-from app.data import load_initial_data
+from app.data import load_initial_data  
+from fastapi import FastAPI, Request, HTTPException, Body, status, Response
+from typing import List
+from app.db import get_collection
+from datetime import datetime
+from bson import ObjectId
+from app.schema import CommentOut, CommentWithRepliesOut
+from pydantic import BaseModel, Field
+from app.cache_client import cache_get, cache_set,cache_del
 from app.utils import prepare_recipes
-from app.cache_client import cache_get, cache_set, cache_del
+from dotenv import load_dotenv
 
-# Carga variables de entorno
 load_dotenv()
-
-# TTLs para los distintos caches
-FEED_CACHE_TTL = int(os.getenv("FEED_CACHE_TTL", 60))
-COMMENTS_TTL   = int(os.getenv("COMMENTS_TTL", FEED_CACHE_TTL))
-
-# 1. Definir el esquema GraphQL
 app = FastAPI(title="recipe-ms")
+COMMENTS_TTL = int(os.getenv("FEED_CACHE_TTL"))
+# 1. Definir el esquema
 schema = strawberry.Schema(query=Query, mutation=Mutation)
 
 # 2. Definimos un context_getter tipado para que FastAPI inyecte Request
@@ -105,7 +91,7 @@ async def get_recipes_by_userNA(request: Request, response: Response):
     )
 
     # Cache miss
-    await cache_set(cache_key, data_to_cache, FEED_CACHE_TTL)
+    await cache_set(cache_key, data_to_cache, COMMENTS_TTL)
     response.headers["X-Cache"] = "MISS"
     return models
 
@@ -126,7 +112,7 @@ async def get_recipes(request: Request, response: Response):
         ensure_fields={"description": "", "user_id": ""}
     )
 
-    await cache_set(cache_key, data_to_cache, FEED_CACHE_TTL)
+    await cache_set(cache_key, data_to_cache, COMMENTS_TTL)
     response.headers["X-Cache"] = "MISS"
     return models
 
@@ -165,7 +151,7 @@ async def get_recipes_by_user(
     )
 
     # 4) Cache-miss: poblar Redis
-    await cache_set(cache_key, data_to_cache, FEED_CACHE_TTL)
+    await cache_set(cache_key, data_to_cache, COMMENTS_TTL)
     response.headers["X-Cache"] = "MISS"
     return models
 
@@ -418,7 +404,7 @@ async def list_comments_with_replies(
         models.append(CommentWithRepliesOut(**item_data))
 
     # 5) Cache-miss: guardamos en cache-API
-    await cache_set(cache_key, data_to_cache, COMMENTS_WITH_REPLIES_TTL)
+    await cache_set(cache_key, data_to_cache, COMMENTS_TTL)
     response.headers["X-Cache"] = "MISS"
 
     return models

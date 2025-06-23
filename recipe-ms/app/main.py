@@ -7,7 +7,7 @@ from app.db import client, get_collection
 from app.initial_data import get_initial_recipes
 from app.data import load_initial_data  
 from fastapi import FastAPI, Request, HTTPException, Body, status, Response
-from typing import List
+from typing import List, Any, Dict
 from app.db import get_collection
 from datetime import datetime
 from bson import ObjectId
@@ -115,6 +115,57 @@ async def get_recipes(request: Request, response: Response):
     await cache_set(cache_key, data_to_cache, COMMENTS_TTL)
     response.headers["X-Cache"] = "MISS"
     return models
+@app.get(
+    "/graphql/recipes/{recipe_id}",
+    response_model=Recipe,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "OK: receta encontrada"},
+        400: {"description": "Bad Request: recipe_id inválido"},
+        404: {"description": "Not Found: receta no existe"},
+    }
+)
+async def get_recipe_by_id(
+    recipe_id: str,
+    response: Response
+) -> Any:
+    cache_key = f"recipes:detail:{recipe_id}"
+
+    # 1) Cache-hit
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        response.headers["X-Cache"] = "HIT"
+        return Recipe(**cached)
+
+    # 2) Validar ID
+    try:
+        oid = ObjectId(recipe_id)
+    except Exception:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "`recipe_id` no es un ID válido")
+
+    # 3) Leer Mongo
+    coll = get_collection("recipes")
+    doc = await coll.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Receta no encontrada")
+
+    # 4) Mapear a Pydantic
+    recipe_data: Dict[str, Any] = {
+        "id": str(doc["_id"]),
+        "images": doc.get("images", []),
+        "video": doc.get("video"),
+        "title": doc.get("title", ""),
+        "steps": doc.get("steps", []),
+        "prep_time": doc.get("prepTime", 0),
+        "portions": doc.get("portions", 1),
+        "description": doc.get("description", ""),
+        "user_id": doc.get("user_id"),
+    }
+
+    # 5) Cache-miss: poblar Redis
+    await cache_set(cache_key, recipe_data, COMMENTS_TTL)
+    response.headers["X-Cache"] = "MISS"
+    return Recipe(**recipe_data)
 
 @app.get(
     "/graphql/get_recipebyuser",
@@ -211,7 +262,7 @@ async def create_recipe(
 
 
 @app.post(
-    "/comments_recipes",
+    "/graphql/comments_recipes",
     response_model=Comment,
     status_code=status.HTTP_201_CREATED,
 )
@@ -274,7 +325,7 @@ async def create_comment(
     return Comment(**saved)
 #obtener los comentarios de una receta
 @app.get(
-    "/comments_recipes/{recipe_id}",
+    "/graphql/comments_recipes/{recipe_id}",
     response_model=List[Comment],
     responses={
         200: {"description": "OK: lista de comentarios"},
@@ -332,7 +383,7 @@ async def get_comments_for_recipe(
     return comments_models
 
 @app.get(
-    "/recipes/{recipe_id}/comments",
+    "/graphql/recipes/{recipe_id}/comments",
     response_model=List[CommentWithRepliesOut],
     responses={
         200: {"description": "OK: comentarios con sus replies"},
@@ -410,7 +461,7 @@ async def list_comments_with_replies(
     return models
 
 @app.put(
-    "/comments/{comment_id}",
+    "/graphql/comments/{comment_id}",
     response_model=CommentOut,
     responses={
         200: {"description": "OK: comentario actualizado"},
@@ -476,7 +527,7 @@ async def rest_update_comment(
     return CommentOut(**updated)
 
 @app.delete(
-    "/comments/{comment_id}",
+    "/graphql/comments/{comment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     responses={
         204: {"description": "No Content: borrado OK"},

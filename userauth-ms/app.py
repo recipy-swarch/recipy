@@ -288,49 +288,40 @@ def logout():
     return jsonify({"msg": "Logged out"}), 200
 
 
+from flask_jwt_extended import verify_jwt_in_request, get_jwt
+
 @app.route("/validate", methods=["GET"])
 def validate():
-    """
-    Valida que el JWT enviado en Authorization:
-      1) tenga firma y expiración válidas (Flask-JWT-Extended),
-      2) siga activo (no revocado) en Redis o, en su defecto, en token-db.
-    """
-    # 1) Verificar firma y expiración con flask-jwt-extended
+    token = request.headers.get("Authorization", "").split("Bearer ")[-1]
+    # 1) verificar firma y expiración
     try:
-        verify_jwt_in_request()
-        # get_jwt_identity devuelve el 'sub' del token (user_id)
-        identity = get_jwt_identity()
+        verify_jwt_in_request()                # lanza si no es válido
+        claims = get_jwt()                     # payload del token
+        user_id = claims["sub"]
     except Exception as e:
-        # Firma inválida o token expirado
         return jsonify({"valid": False, "error": str(e)}), 401
 
-    # Extraer el token crudo desde la cabecera Authorization
-    token = request.headers.get("Authorization", "").split("Bearer ")[-1]
+    cache_key = f"token:{token}"
 
-    # 2.a) Intentar validar en caché Redis
-    try:
-        # redis_client es instancia de Redis()
-        if redis_client.exists(f"token:{token}"):
-            return jsonify({"valid": True, "user_id": identity}), 200
-    except Exception as e:
-        app.logger.warning(f"Redis error en validate: {e}")
+    # 2a) comprobar rápido en Redis
+    if redis_client.exists(cache_key):
+        redis_client.expire(cache_key, int(app.config['JWT_ACCESS_TOKEN_EXPIRES'].total_seconds()))
+        return jsonify({"valid": True,  "user_id": user_id}), 200
 
-    # 2.b) Fallback: validar en token-db (PostgreSQL)
+    # 2b) fallback a token-db
     conn = get_token_db_conn()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT 1 FROM recipy.jwt_tokens WHERE token = %s;",
-        (token,)
-    )
+    cur  = conn.cursor()
+    cur.execute("SELECT 1 FROM recipy.jwt_tokens WHERE token = %s;", (token,))
     exists = cur.fetchone() is not None
     conn.close()
 
     if not exists:
-        # Token ha sido revocado o no existe
         return jsonify({"valid": False, "error": "revoked or missing"}), 401
 
-    # Token válido y activo
-    return jsonify({"valid": True, "user_id": identity}), 200
+    # recachear en Redis
+    redis_client.setex(cache_key, int(app.config['JWT_ACCESS_TOKEN_EXPIRES'].total_seconds()), user_id)
+    return jsonify({"valid": True,  "user_id": user_id}), 200
+
 
 
 if __name__ == "__main__":

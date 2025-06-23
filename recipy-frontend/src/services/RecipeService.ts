@@ -79,27 +79,30 @@ class RecipeService {
     return (await response.json()) as IRecipe[];
   };
 
-  createRecipe = async (formData: FormData, token: string): Promise<IRecipe> => {
+  createRecipe = async (
+    formData: FormData,
+    token: string
+  ): Promise<IRecipe> => {
     const res = await fetch(`${this.apiUrl}/recipe/graphql/create_recipe`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        },
-        body: formData, // el navegador añade multipart/form-data con boundary
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData, // el navegador añade multipart/form-data con boundary
     });
-    
+
     if (!res.ok) {
-        const text = await res.text();
-        console.error('Error creating recipe:', text);
-        throw new Error(`Error ${res.status}`);
+      const text = await res.text();
+      console.error("Error creating recipe:", text);
+      throw new Error(`Error ${res.status}`);
     }
-    
+
     const data_r = await res.json();
     if (data_r.error) {
-        console.error('Error creating recipe:', data_r.error);
-        throw new Error(`Error ${data_r.error}`);
+      console.error("Error creating recipe:", data_r.error);
+      throw new Error(`Error ${data_r.error}`);
     }
-    
+
     return data_r as IRecipe;
   };
 }

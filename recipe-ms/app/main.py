@@ -110,7 +110,28 @@ async def get_recipes_by_userNA(request: Request):
 
     return recipes
 
+app.get("/graphql/get_recipe/{id}", response_model=Recipe)
+async def get_recipe(id: str, request: Request):
+    coll = get_collection("recipes")
 
+    # Verificar si el ID tiene formato válido de ObjectId
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=400, detail="Invalid recipe ID format")
+
+    # Buscar la receta por _id
+    doc = await coll.find_one({"_id": ObjectId(id)})
+
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+
+    # Transformar _id a string para que coincida con el modelo Pydantic
+    doc["id"] = str(doc.pop("_id"))
+
+    # Asegurar que los campos obligatorios existen
+    doc.setdefault("user_id", "")
+    doc.setdefault("description", "")
+
+    return Recipe(**doc)
 
 
 

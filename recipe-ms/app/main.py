@@ -13,19 +13,13 @@ from datetime import datetime
 from bson import ObjectId
 from app.schema import CommentOut, CommentWithRepliesOut
 from pydantic import BaseModel, Field
-from fastapi.middleware.cors import CORSMiddleware
+from app.cache_client import cache_get, cache_set,cache_del
+from app.utils import prepare_recipes
+from dotenv import load_dotenv
 
-
+load_dotenv()
 app = FastAPI(title="recipe-ms")
-
-# Permite peticiones desde tu UI (puedes restringir el origen en prod)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],            
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+COMMENTS_TTL = int(os.getenv("FEED_CACHE_TTL"))
 # 1. Definir el esquema
 schema = strawberry.Schema(query=Query, mutation=Mutation)
 
@@ -48,15 +42,6 @@ class CommentUpdateIn(BaseModel):
 app = FastAPI(title="Recipe Service")
 app.include_router(graphql_app, prefix="/graphql")
 
-CACHE_API = os.getenv("CACHE_API_URL")
-_http = httpx.AsyncClient(timeout=3.0)
-
-async def cache_del(key: str):
-    # llamas al DELETE de cache-api
-    resp = await _http.delete(f"{CACHE_API}/cache/{key}")
-    # opcionalmente ignoras 404
-    if resp.status_code not in (204, 404):
-        resp.raise_for_status()
 
 # 3. Startup hook para Mongo + datos iniciales
 @app.on_event("startup")
@@ -84,124 +69,147 @@ async def on_startup():
 
 
 @app.get("/graphql/get_recipebyuserNA", response_model=List[Recipe])
-async def get_recipes_by_userNA(request: Request):
-    # 1) Leer user_id de query params en lugar de headers
+async def get_recipes_by_userNA(request: Request, response: Response):
     user_id = request.query_params.get("user_id")
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Debe indicar `user_id` como parámetro de consulta"
-        )
+        raise HTTPException(400, "Debe indicar `user_id` como parámetro de consulta")
 
+    cache_key = f"recipes:user_feed:{user_id}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        response.headers["X-Cache"] = "HIT"
+        return [Recipe(**r) for r in cached]
 
-    # 2) Consultar Mongo por ese user_id
+    # Leer de Mongo
     coll = get_collection("recipes")
     raw_docs = await coll.find({"user_id": user_id}).to_list(100)
 
+    # Transformar con helper
+    data_to_cache, models = prepare_recipes(
+        raw_docs,
+        ensure_fields={"description": "", "user_id": user_id}
+    )
 
-    # 3) Mapear ObjectId → id y asegurar description/user_id
-    recipes: List[Recipe] = []
-    for doc in raw_docs:
-        doc["id"] = str(doc.pop("_id"))
-        doc.setdefault("description", "")
-        doc.setdefault("user_id", user_id)
-        recipes.append(Recipe(**doc))
-
-
-    return recipes
-
-
-
+    # Cache miss
+    await cache_set(cache_key, data_to_cache, COMMENTS_TTL)
+    response.headers["X-Cache"] = "MISS"
+    return models
 
 
 @app.get("/graphql/get_recipes", response_model=List[Recipe])
-async def get_recipes(request: Request):
+async def get_recipes(request: Request, response: Response):
+    cache_key = "recipes:feed"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        response.headers["X-Cache"] = "HIT"
+        return [Recipe(**r) for r in cached]
+
     coll = get_collection("recipes")
     raw_docs = await coll.find({}).to_list(100)
 
-    recipes: List[Recipe] = []
-    for doc in raw_docs:
-        doc["id"] = str(doc.pop("_id"))
+    data_to_cache, models = prepare_recipes(
+        raw_docs,
+        ensure_fields={"description": "", "user_id": ""}
+    )
 
-        # Asegurar campos obligatorios
-        doc.setdefault("user_id", "")
-        doc.setdefault("description", "")  # <- Asegura que exista
+    await cache_set(cache_key, data_to_cache, COMMENTS_TTL)
+    response.headers["X-Cache"] = "MISS"
+    return models
 
-        recipes.append(Recipe(**doc))
-    return recipes
-
-
-@app.get("/graphql/get_recipebyuser", response_model=List[Recipe])
-async def get_recipes_by_user(request: Request):
-    # 1) Extraer user_id del header (x-user-id o Authorization)
+@app.get(
+    "/graphql/get_recipebyuser",
+    response_model=List[Recipe]
+)
+async def get_recipes_by_user(
+    request: Request,
+    response: Response
+):
+    # 0) Autenticación (x-user-id o Authorization)
     try:
-        # Creamos un “pseudo-info” para reusar tu helper
         info = type("Info", (), {"context": {"request": request}})
         user_id = get_current_user_id(info)
     except HTTPException as e:
-        # Si no viene auth o es inválida, devolvemos 401
         raise e
 
-    # 2) Consultar Mongo
+    # clave de cache para este usuario
+    cache_key = f"recipes:user_feed:{user_id}"
+
+    # 1) Intentar cache-hit
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        response.headers["X-Cache"] = "HIT"
+        return [Recipe(**r) for r in cached]
+
+    # 2) Lectura desde Mongo
     coll = get_collection("recipes")
     raw_docs = await coll.find({"user_id": user_id}).to_list(100)
 
-    # 3) Mapear ObjectId y generar instancias de Recipe
-    recipes: List[Recipe] = []
-    for doc in raw_docs:
-        doc["id"] = str(doc.pop("_id"))
-        recipes.append(Recipe(**doc))
+    # 3) Transformar con helper
+    data_to_cache, models = prepare_recipes(
+        raw_docs,
+        ensure_fields={"user_id": user_id}
+    )
 
-    return recipes
+    # 4) Cache-miss: poblar Redis
+    await cache_set(cache_key, data_to_cache, COMMENTS_TTL)
+    response.headers["X-Cache"] = "MISS"
+    return models
 
-@app.post("/graphql/create_recipe", response_model=Recipe)
-async def create_recipe(request: Request, payload: dict = Body(...)):
-    # 1) Autenticación / extracción de user_id
+
+@app.post(
+    "/graphql/create_recipe",
+    response_model=Recipe,
+    status_code=status.HTTP_201_CREATED
+)
+async def create_recipe(
+    request: Request,
+    payload: dict = Body(...)
+):
+    # 1) Autenticación
     try:
         info = type("Info", (), {"context": {"request": request}})
         user_id = get_current_user_id(info)
-        print("Encontramos user_id:", user_id)
     except HTTPException as e:
         raise e
 
-    # 2) Leer campos obligatorios y opcionales
-    title     = payload.get("title")
-    description     = payload.get("description")
-    prep_time = payload.get("prep_time")
-    portions  = payload.get("portions")
-    steps     = payload.get("steps")
-    images    = payload.get("images", None)
-    video     = payload.get("video", None)
-    
+    # 2) Lectura de campos
+    title       = payload.get("title")
+    description = payload.get("description")
+    prep_time   = payload.get("prep_time")
+    portions    = payload.get("portions")
+    steps       = payload.get("steps")
+    images      = payload.get("images", None)
+    video       = payload.get("video", None)
 
-    # (Opcional: validar que title, prep_time, portions y steps no sean None)
+    # (Aquí podrías validar que title, prep_time, portions y steps estén presentes)
 
     # 3) Insertar en Mongo
-    doc = {
-        "user_id":   user_id,
-        "title":     title,
-        "description": description,
-        "prep_time": prep_time,
-        "portions":  portions,
-        "steps":     steps,
-        "images":    images,
-        "video":     video,
-    }
-
-    print("Receta a insertar:", doc)
-
     coll = get_collection("recipes")
+    res = await coll.insert_one({
+        "user_id":    user_id,
+        "title":      title,
+        "description":description,
+        "prep_time":  prep_time,
+        "portions":   portions,
+        "steps":      steps,
+        "images":     images,
+        "video":      video,
+    })
 
-    print("Colección de recetas:", coll)
-
-    res = await coll.insert_one(doc)
-
-    print("Insertado:", res.inserted_id)
-
-    # 4) Leer de vuelta y mapear _id → id
+    # 4) Leer y normalizar
     saved = await coll.find_one({"_id": res.inserted_id})
     saved["id"] = str(saved.pop("_id"))
+
+    # 5) Invalidar cachés relevantes
+    # - feed global
+    await cache_del("recipes:feed")
+    # - feed por usuario
+    await cache_del(f"recipes:user_feed:{user_id}")
+
+    # 6) Devolver la nueva receta
     return Recipe(**saved)
+
+
 @app.post(
     "/comments_recipes",
     response_model=Comment,
@@ -274,28 +282,54 @@ async def create_comment(
         404: {"description": "Not Found: receta no existe"}
     }
 )
-async def get_comments_for_recipe(recipe_id: str, request: Request):
-    # 1) Validar recipe_id como ObjectId
+async def get_comments_for_recipe(
+    recipe_id: str,
+    response: Response
+):
+    cache_key = f"recipes:comments:{recipe_id}"
+
+    # 0) Intentamos cache-hit
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        response.headers["X-Cache"] = "HIT"
+        # cached ya es una lista de dicts validos para Comment
+        return [Comment(**c) for c in cached]
+
+    # 1) Validar recipe_id
     try:
         _ = ObjectId(recipe_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="`recipe_id` no es un ID válido")
-    
-    # 2) Verificar que la receta existe (opcional, pero recomendado)
+    except:
+        raise HTTPException(400, "`recipe_id` no es un ID válido")
+
+    # 2) Verificar que la receta existe
     coll_recipes = get_collection("recipes")
     if not await coll_recipes.find_one({"_id": ObjectId(recipe_id)}):
-        raise HTTPException(status_code=404, detail="Receta no encontrada")
+        raise HTTPException(404, "Receta no encontrada")
 
-    # 3) Recuperar comentarios
+    # 3) Recuperar comentarios de Mongo
     coll_comments = get_collection("comments")
     raw = await coll_comments.find({"recipe_id": recipe_id}).to_list(100)
 
-    comments: List[Comment] = []
-    for c in raw:
-        c["id"] = str(c.pop("_id"))
-        comments.append(Comment(**c))
+    # 4) Construir listas paralelas:
+    comments_data = []
+    comments_models = []
+    for doc in raw:
+        cdict = {
+            "id": str(doc["_id"]),
+            "recipe_id": doc["recipe_id"],
+            "user_id": doc["user_id"],
+            "content": doc["content"],
+            "parent_id": doc.get("parent_id"),
+            "created_at": doc["created_at"],
+        }
+        comments_data.append(cdict)             # -> para cache
+        comments_models.append(Comment(**cdict))  # -> para la respuesta
 
-    return comments
+    # 5) Cache‐miss: poblar Redis con los dicts puros
+    await cache_set(cache_key, comments_data, COMMENTS_TTL)
+    response.headers["X-Cache"] = "MISS"
+
+    return comments_models
 
 @app.get(
     "/recipes/{recipe_id}/comments",
@@ -307,7 +341,18 @@ async def get_comments_for_recipe(recipe_id: str, request: Request):
     },
     status_code=status.HTTP_200_OK
 )
-async def list_comments_with_replies(recipe_id: str):
+async def list_comments_with_replies(
+    recipe_id: str,
+    response: Response
+):
+    cache_key = f"recipes:comments_with_replies:{recipe_id}"
+
+    # 0) Intentamos cache-hit
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        response.headers["X-Cache"] = "HIT"
+        return [CommentWithRepliesOut(**item) for item in cached]
+
     # 1) Validar recipe_id
     try:
         oid = ObjectId(recipe_id)
@@ -326,9 +371,11 @@ async def list_comments_with_replies(recipe_id: str):
         "parent_id": None
     }).to_list(100)
 
-    results: List[CommentWithRepliesOut] = []
+    # 4) Construir listas paralelas: datos puros y modelos
+    data_to_cache = []
+    models: List[CommentWithRepliesOut] = []
+
     for doc in raw_comments:
-        # Normalizar el documento Mongo a dict Pydantic
         base = {
             "id": str(doc["_id"]),
             "recipe_id": doc["recipe_id"],
@@ -338,9 +385,9 @@ async def list_comments_with_replies(recipe_id: str):
             "created_at": doc["created_at"],
         }
 
-        # 4) Recuperar sus replies
+        # 4a) Recuperar sus replies
         raw_replies = await coll_comments.find({"parent_id": base["id"]}).to_list(100)
-        replies = [
+        replies_data = [
             {
                 "id": str(r["_id"]),
                 "recipe_id": r["recipe_id"],
@@ -352,11 +399,16 @@ async def list_comments_with_replies(recipe_id: str):
             for r in raw_replies
         ]
 
-        # 5) Construir el Pydantic model
-        results.append(CommentWithRepliesOut(**{**base, "replies": replies}))
+        item_data = {**base, "replies": replies_data}
+        data_to_cache.append(item_data)
+        models.append(CommentWithRepliesOut(**item_data))
 
-    return results
-# --- PUT  /comments/{comment_id} ---
+    # 5) Cache-miss: guardamos en cache-API
+    await cache_set(cache_key, data_to_cache, COMMENTS_TTL)
+    response.headers["X-Cache"] = "MISS"
+
+    return models
+
 @app.put(
     "/comments/{comment_id}",
     response_model=CommentOut,
@@ -372,6 +424,7 @@ async def list_comments_with_replies(recipe_id: str):
 async def rest_update_comment(
     comment_id: str,
     request: Request,
+    response: Response,
     payload: CommentUpdateIn
 ):
     # 1) Validar comment_id
@@ -404,13 +457,24 @@ async def rest_update_comment(
         {"$set": {"content": payload.content}}
     )
 
-    # 6) Leer y normalizar
+    # 6) Leer y normalizar resultado
     updated = await coll.find_one({"_id": oid})
     updated["id"] = str(updated.pop("_id"))
+
+    # 7) Invalidar caché de esta receta
+    recipe_id = updated["recipe_id"]
+    key_list        = f"recipes:comments:{recipe_id}"
+    key_with_replies = f"recipes:comments_with_replies:{recipe_id}"
+
+    # borramos ambas claves
+    await cache_del(key_list)
+    await cache_del(key_with_replies)
+
+    # opcional: exponer qué se invalidó
+    response.headers["X-Cache-Invalidated"] = ",".join([key_list, key_with_replies])
+
     return CommentOut(**updated)
 
-
-# --- DELETE /comments/{comment_id} ---
 @app.delete(
     "/comments/{comment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -422,7 +486,11 @@ async def rest_update_comment(
         404: {"description": "Not Found: comentario no existe"},
     }
 )
-async def rest_delete_comment(comment_id: str, request: Request):
+async def rest_delete_comment(
+    comment_id: str,
+    request: Request,
+    response: Response
+):
     # 1) Validar comment_id
     try:
         oid = ObjectId(comment_id)
@@ -438,15 +506,30 @@ async def rest_delete_comment(comment_id: str, request: Request):
 
     coll = get_collection("comments")
 
-    # 3) Borrar condicional por autor
-    res = await coll.delete_one({"_id": oid, "user_id": user_id})
-    if res.deleted_count == 0:
+    # 3) Recuperar antes de borrar para extraer recipe_id
+    original = await coll.find_one({"_id": oid})
+    if not original or original.get("user_id") != user_id:
+        # cubre 404 y 403 en un solo chequeo
         raise HTTPException(404, detail="Comentario no existe o no tienes permiso")
 
-    # 4) FastAPI enviará 204 No Content automáticamente
+    recipe_id = original["recipe_id"]
+
+    # 4) Borrar
+    await coll.delete_one({"_id": oid})
+
+    # 5) Invalidar caché de lista y de with_replies
+    key_list         = f"recipes:comments:{recipe_id}"
+    key_with_replies = f"recipes:comments_with_replies:{recipe_id}"
+
+    await cache_del(key_list)
+    await cache_del(key_with_replies)
+
+    # 6) Opcional: exponer claves invalidadas
+    response.headers["X-Cache-Invalidated"] = f"{key_list},{key_with_replies}"
+
+    # FastAPI responde 204 No Content
     return
 
-# — POST /graphql/like_recipe
 @app.post(
     "/graphql/like_recipe",
     response_model=Like,

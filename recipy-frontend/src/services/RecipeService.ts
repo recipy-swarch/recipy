@@ -51,7 +51,7 @@ class RecipeService {
   };
 
   fetchComments = async (recipe_id: string): Promise<IComments[]> => {
-    const url = `${this.apiUrl}/recipe/graphql/comments_recipes/${recipe_id}`;
+    const url = `${this.apiUrl}/recipe/graphql/recipes/${recipe_id}/comments`;
     console.log("Fetching comments from:", url);
     const response = await fetch(url, {
       method: "GET",
@@ -65,6 +65,38 @@ class RecipeService {
     const data = await response.json();
     // Esperamos un array con shape IComments[]
     return data as IComments[];
+  }
+  createComment = async(
+    recipeId: string,
+    content: string,
+    parentId?: string,
+    token?: string
+  ): Promise<IComments> => {
+    const url = `${this.apiUrl}/recipe/graphql/comments_recipes`;
+    const payload: any = { recipe_id: recipeId, content };
+    if (parentId) payload.parent_id = parentId;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    console.log("CommentService.createComment -> URL:", url, "headers:", headers, "payload:", payload);
+
+    const resp = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error("Error createComment:", text);
+      throw new Error(`Error ${resp.status}: ${text}`);
+    }
+    const data = await resp.json();
+    return data as IComments;
   }
 
   fetchUserRecipes = async (userId: string): Promise<IRecipe[]> => {
@@ -190,19 +222,28 @@ class RecipeService {
   }
 
   // 4) GET: saber si ya dio like (opcional, si implementaste el endpoint)
-  hasLiked = async (recipeId: string, token?: string): Promise<boolean> => {
+    hasLiked = async(recipeId: string, token?: string): Promise<boolean> =>{
     const url = `${this.apiUrl}/recipe/graphql/has_liked?recipe_id=${recipeId}`;
     const headers: Record<string,string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
     const resp = await fetch(url, {
       method: "GET",
       headers,
     });
+    if (resp.status === 404) {
+      // Receta no existe o endpoint devuelve Not Found: tratamos como "no liked"
+      console.warn(`hasLiked: receta ${recipeId} no encontrada (404). Devolviendo false.`);
+      return false;
+    }
     if (!resp.ok) {
+      // Otros errores (401, 500, etc): los dejamos lanzar para manejar en la acción
       const text = await resp.text();
       console.error("Error hasLiked:", text);
       throw new Error(`Error ${resp.status}: ${text}`);
     }
+    // 200 OK: parseamos boolean
     const data = await resp.json();
     return data as boolean;
   }

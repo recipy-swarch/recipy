@@ -52,6 +52,21 @@ export async function fetchComments(recipeId: string): Promise<{ success: true; 
   }
 }
 
+export async function createComment(
+  recipeId: string,
+  content: string,
+  parentId?: string,
+  token?: string
+): Promise<{ success: true; comment: IComments } | { success: false; error: any }> {
+  try {
+    // Pasa token al service, igual que haces en likeRecipe:
+    const comment = await RecipeService.createComment(recipeId, content, parentId, token);
+    return { success: true, comment };
+  } catch (error) {
+    console.error("Action createComment error:", error);
+    return { success: false, error };
+  }
+}
 export async function fetchUserRecipes(userId: string) {
   try {
     console.log("Fetching user recipes for userId:", userId);
@@ -103,12 +118,17 @@ export async function fetchLikesCount(recipeId: string): Promise<{ success: true
 /**
  *   Verificar si ya dio like: devuelve { success: true; hasLiked: boolean } o { success: false; error }
  */
-export async function fetchHasLiked(recipeId: string, token?: string): Promise<{ success: true; hasLiked: boolean } | { success: false; error: any }> {
+export async function fetchHasLiked(
+  recipeId: string,
+  token?: string
+): Promise<{ success: true; hasLiked: boolean } | { success: false; error: any }> {
   try {
     const hasLiked = await RecipeService.hasLiked(recipeId, token);
     return { success: true, hasLiked };
   } catch (error) {
     console.error("Action fetchHasLiked error:", error);
+    // Opcional: podrías devolver success: true con hasLiked=false en ciertos errores,
+    // pero aquí devolvemos success:false para errores inesperados (p.ej. 401, 500).
     return { success: false, error };
   }
 }

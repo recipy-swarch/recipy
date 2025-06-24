@@ -30,7 +30,16 @@ export async function fetchAllRecipes() {
     return { success: false, error };
   }
 }
-
+export async function fetchRecipe(recipeId:string) {
+  try {
+    console.log("Fetching one recipe");
+    const recipes = await RecipeService.fetchRecipe(recipeId);
+    return { success: true, recipes };
+  } catch (error) {
+    console.error("Error fetching recipe:", error);
+    return { success: false, error };
+  }
+}
 export async function fetchUserRecipes(userId: string) {
   try {
     console.log("Fetching user recipes for userId:", userId);

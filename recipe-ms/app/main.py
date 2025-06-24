@@ -6,7 +6,7 @@ from app.schema import Query, Mutation, Comment, Recipe, get_current_user_id, Li
 from app.db import client, get_collection
 from app.initial_data import get_initial_recipes
 from app.data import load_initial_data  
-from fastapi import FastAPI, Request, HTTPException, Body, status, Response
+from fastapi import FastAPI, Request, HTTPException, Body, status, Response, APIRouter
 from typing import List, Any, Dict
 from app.db import get_collection
 from datetime import datetime
@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from app.cache_client import cache_get, cache_set,cache_del
 from app.utils import prepare_recipes
 from dotenv import load_dotenv
-
+router = APIRouter()
 load_dotenv()
 app = FastAPI(title="recipe-ms")
 COMMENTS_TTL = int(os.getenv("FEED_CACHE_TTL"))
@@ -271,6 +271,11 @@ async def create_comment(
     response: Response,
     payload: dict = Body(...),
 ):
+    """
+    Crea un comentario en Mongo para la receta. Requiere autenticación.
+    Invalida cache tanto de comments simples como de comments con replies.
+    Opcionalmente repuebla cache de comments simples y/o con replies.
+    """
     # 1) Autenticación / extracción de user_id
     try:
         info = type("Info", (), {"context": {"request": request}})
@@ -278,7 +283,7 @@ async def create_comment(
     except HTTPException as e:
         raise e
 
-    # 2) Leer y validar campos
+    # 2) Leer y validar fields
     recipe_id = payload.get("recipe_id")
     content   = payload.get("content")
     parent_id = payload.get("parent_id", None)
@@ -288,41 +293,47 @@ async def create_comment(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Faltan campos obligatorios: recipe_id y content",
         )
-    # Validar recipe_id como ObjectId
     try:
         oid = ObjectId(recipe_id)
-    except:
-        raise HTTPException(400, "`recipe_id` no es un ID válido")
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="`recipe_id` no es un ID válido"
+        )
 
-    # 3) Verificar que la receta exista
+    # 3) Verificar receta existe
     coll_recipes = get_collection("recipes")
     if not await coll_recipes.find_one({"_id": oid}):
-        raise HTTPException(404, "Receta no encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Receta no encontrada"
+        )
 
-    # 4) Insertar el comentario en Mongo
+    # 4) Insertar comentario
     coll_comments = get_collection("comments")
-    doc = {
+    new_doc = {
         "recipe_id": recipe_id,
         "user_id":   user_id,
         "content":   content,
         "parent_id": parent_id,
         "created_at": datetime.utcnow(),
     }
-    res = await coll_comments.insert_one(doc)
+    insert_res = await coll_comments.insert_one(new_doc)
 
-    # 5) Leer de vuelta y mapear _id → id
-    saved = await coll_comments.find_one({"_id": res.inserted_id})
+    # 5) Leer guardado y preparar objeto de retorno
+    saved = await coll_comments.find_one({"_id": insert_res.inserted_id})
     saved["id"] = str(saved.pop("_id"))
 
-    # 6) Invalidate cache de comments para esta receta
-    cache_key = f"recipes:comments:{recipe_id}"
-    await cache_del(cache_key)
-    response.headers["X-Cache-Invalidated"] = cache_key
-    # tras construir 'comments' como lista de dicts o Pydantic
-    await cache_set(f"recipes:comments:{recipe_id}", [c.dict() for c in comments], COMMENTS_TTL)
-    response.headers["X-Cache"] = "MISS"
-
+    # 6) Invalidate cache de ambos endpoints
+    key_simple = f"recipes:comments:{recipe_id}"
+    key_with_replies = f"recipes:comments_with_replies:{recipe_id}"
+    # Invalida ambas clave
+    await cache_del(key_simple)
+    await cache_del(key_with_replies)
+    # Opcional: marcar header para debugging
+    response.headers["X-Cache-Invalidated"] = f"{key_simple}, {key_with_replies}"
     return Comment(**saved)
+
 #obtener los comentarios de una receta
 @app.get(
     "/graphql/comments_recipes/{recipe_id}",
@@ -402,18 +413,21 @@ async def list_comments_with_replies(
     cached = await cache_get(cache_key)
     if cached is not None:
         response.headers["X-Cache"] = "HIT"
+        # cached es lista de dicts cuyos campos created_at ya son strings ISO
         return [CommentWithRepliesOut(**item) for item in cached]
 
     # 1) Validar recipe_id
     try:
         oid = ObjectId(recipe_id)
-    except:
-        raise HTTPException(400, "`recipe_id` no es un ID válido")
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="`recipe_id` no es un ID válido")
 
     # 2) Verificar receta existe
     coll_recipes = get_collection("recipes")
     if not await coll_recipes.find_one({"_id": oid}):
-        raise HTTPException(404, "Receta no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Receta no encontrada")
 
     # 3) Obtener comentarios padre
     coll_comments = get_collection("comments")
@@ -422,39 +436,53 @@ async def list_comments_with_replies(
         "parent_id": None
     }).to_list(100)
 
-    # 4) Construir listas paralelas: datos puros y modelos
+    # 4) Construir data_to_cache y modelos
     data_to_cache = []
     models: List[CommentWithRepliesOut] = []
 
     for doc in raw_comments:
+        # Convertir created_at a ISO string
+        created = doc.get("created_at")
+        if isinstance(created, datetime):
+            created_iso = created.isoformat()
+        else:
+            created_iso = str(created)
+
         base = {
             "id": str(doc["_id"]),
             "recipe_id": doc["recipe_id"],
             "user_id": doc["user_id"],
             "content": doc["content"],
             "parent_id": doc.get("parent_id"),
-            "created_at": doc["created_at"],
+            "created_at": created_iso,
         }
 
         # 4a) Recuperar sus replies
         raw_replies = await coll_comments.find({"parent_id": base["id"]}).to_list(100)
-        replies_data = [
-            {
+        replies_data = []
+        for r in raw_replies:
+            # Convertir each reply created_at a ISO string
+            r_created = r.get("created_at")
+            if isinstance(r_created, datetime):
+                r_created_iso = r_created.isoformat()
+            else:
+                r_created_iso = str(r_created)
+            reply_item = {
                 "id": str(r["_id"]),
                 "recipe_id": r["recipe_id"],
                 "user_id": r["user_id"],
                 "content": r["content"],
                 "parent_id": r.get("parent_id"),
-                "created_at": r["created_at"],
+                "created_at": r_created_iso,
             }
-            for r in raw_replies
-        ]
+            replies_data.append(reply_item)
 
         item_data = {**base, "replies": replies_data}
         data_to_cache.append(item_data)
+        # Construir modelo Pydantic: CommentWithRepliesOut espera created_at como str (ISO)
         models.append(CommentWithRepliesOut(**item_data))
 
-    # 5) Cache-miss: guardamos en cache-API
+    # 5) Cache‐miss: guardamos en cache-API
     await cache_set(cache_key, data_to_cache, COMMENTS_TTL)
     response.headers["X-Cache"] = "MISS"
 
@@ -685,35 +713,3 @@ async def rest_likes_count(recipe_id: str):
     coll_likes = get_collection("likes")
     cnt = await coll_likes.count_documents({"recipe_id": recipe_id})
     return cnt
-@app.get(
-    "/graphql/has_liked",
-    response_model=bool,
-    responses={
-        400: {"description": "Bad Request: recipe_id inválido o ausente"},
-        401: {"description": "Unauthorized"},
-        404: {"description": "Not Found: receta no existe"}
-    }
-)
-async def rest_has_liked(request: Request, recipe_id: str):
-    # 1) Validar recipe_id presente
-    if not recipe_id:
-        raise HTTPException(400, detail="Falta el parámetro `recipe_id`")
-    # 2) Validar formato ObjectId
-    try:
-        oid = ObjectId(recipe_id)
-    except Exception:
-        raise HTTPException(400, detail="`recipe_id` no es un ID válido")
-    # 3) Verificar que exista la receta
-    coll_recipes = get_collection("recipes")
-    if not await coll_recipes.find_one({"_id": oid}):
-        raise HTTPException(404, detail="Receta no existe")
-    # 4) Autenticación: extraer user_id
-    try:
-        info = type("Info", (), {"context": {"request": request}})
-        user_id = get_current_user_id(info)
-    except HTTPException as e:
-        raise e
-    # 5) Consultar si ya hay like
-    coll_likes = get_collection("likes")
-    exists = await coll_likes.find_one({"recipe_id": recipe_id, "user_id": user_id})
-    return bool(exists)

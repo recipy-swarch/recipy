@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { fetchRecipe, fetchComments, fetchLikesCount, fetchHasLiked, likeRecipe, unlikeRecipe } from "@/lib/actions";
+import { fetchRecipe, fetchComments,createComment, fetchLikesCount, fetchHasLiked, likeRecipe, unlikeRecipe } from "@/lib/actions";
 import { IRecipe, IComments, ILike } from "@/lib/types";
 
 function getAuthToken(): string | null {
@@ -23,6 +23,12 @@ export default function RecipeDetailPage() {
   const [comments, setComments] = useState<IComments[]>([]);
   const [loadingComments, setLoadingComments] = useState<boolean>(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
+
+  const [newCommentContent, setNewCommentContent] = useState("");
+  const [loadingCreatingComment, setLoadingCreatingComment] = useState(false);
+  const [createCommentError, setCreateCommentError] = useState<string | null>(null);
+
+  const [replyToId, setReplyToId] = useState<string | null>(null);
 
   const [likesCount, setLikesCount] = useState<number>(0);
   const [hasLiked, setHasLiked] = useState<boolean>(false);
@@ -74,6 +80,52 @@ export default function RecipeDetailPage() {
       })
       .finally(() => setLoadingComments(false));
   }, [recipe]);
+  const handleSubmitComment = async (e: FormEvent) => {
+  e.preventDefault();
+  if (!recipe) return;
+
+  const content = newCommentContent.trim();
+  if (!content) {
+    setCreateCommentError("El comentario no puede estar vacío.");
+    return;
+  }
+  const token = localStorage.getItem("token");
+  console.log("handleSubmitComment: token =", token);
+  if (!token) {
+    setCreateCommentError("Debes iniciar sesión para comentar.");
+    router.push("/login");
+    return;
+  }
+  setLoadingCreatingComment(true);
+
+  // Nota: pasamos token a la acción
+  const res = await createComment(recipe.id, content, replyToId ?? undefined, token);
+  if (res.success) {
+    const created = res.comment;
+    setNewCommentContent("");
+    setReplyToId(null);
+    // Actualizar lista (refetch o optimista)
+    try {
+      const fres = await fetchComments(recipe.id);
+      if (fres.success) setComments(fres.comments);
+    } catch {
+      setComments(prev => [created, ...prev]);
+    }
+  } else {
+    console.error(res.error);
+    const msg = (res.error as any)?.message || String(res.error);
+    if (msg.includes("401")) {
+      setCreateCommentError("Sesión inválida. Por favor vuelve a iniciar sesión.");
+      localStorage.removeItem("token");
+      router.push("/login");
+    } else if (msg.includes("400")) {
+      setCreateCommentError("Datos inválidos para el comentario.");
+    } else {
+      setCreateCommentError("Error al enviar el comentario. Intenta nuevamente.");
+    }
+  }
+  setLoadingCreatingComment(false);
+};
  // 3) Cargar likesCount y estado hasLiked
   useEffect(() => {
     if (!recipe) return;
@@ -92,19 +144,15 @@ export default function RecipeDetailPage() {
       .catch(err => console.error(err));
     // 3b) estado “ya dio like?” (si implementaste endpoint)
     if (token) {
-      fetchHasLiked(recipe.id, token)
-        .then(res => {
-          if (res.success) {
-            setHasLiked(res.hasLiked);
-          } else {
-            console.error(res.error);
-            // Dejar false por defecto
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          // dejar false
-        });
+      fetchHasLiked(recipe.id, token).then(res => {
+        if (res.success) {
+          setHasLiked(res.hasLiked);
+        } else {
+          console.error("Error al obtener hasLiked:", res.error);
+          // Podrías, por ejemplo, si es 401, limpiar token y redirigir a login
+          // Pero si es otro error, quizás solo dejar hasLiked=false
+        }
+      });
     }
   }, [recipe]);
 
@@ -259,8 +307,51 @@ export default function RecipeDetailPage() {
           <p className="mt-2 text-red-500">{likeError}</p>
         )}
       </section>
+    {/* Sección Comentarios: Formulario + lista */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-semibold mb-4">Comentarios</h2>
 
-
+        {/* Formulario de nuevo comentario */}
+        <form onSubmit={handleSubmitComment} className="mb-6 space-y-2">
+          {replyToId && (
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Respondiendo al comentario {replyToId.slice(-4)}...
+              </span>
+              <button
+                type="button"
+                className="text-sm text-red-500 hover:underline"
+                onClick={() => setReplyToId(null)}
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+          <textarea
+            className="w-full border rounded-lg p-2 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            placeholder="Escribe tu comentario..."
+            value={newCommentContent}
+            onChange={(e) => setNewCommentContent(e.target.value)}
+            rows={3}
+            disabled={loadingCreatingComment}
+          />
+          {createCommentError && (
+            <p className="text-red-500 text-sm">{createCommentError}</p>
+          )}
+          <button
+            type="submit"
+            disabled={loadingCreatingComment}
+            className={
+              "px-4 py-2 rounded-lg font-medium text-white " +
+              (loadingCreatingComment
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700")
+            }
+          >
+            {loadingCreatingComment ? "Enviando..." : "Enviar comentario"}
+          </button>
+        </form>
+      </section>
       {/* Comentarios inline */}
       <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">Comentarios</h2>

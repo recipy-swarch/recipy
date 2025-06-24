@@ -1,38 +1,42 @@
-"use client"
+"use client";
 
-import { useRouter, usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
-import Image from "next/image"
-import Link from "next/link"
-import { fetchRecipe } from "@/lib/actions"
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { fetchRecipe } from "@/lib/actions";
 
 export default function RecipeDetailPage() {
-  const router = useRouter()
-  const path = usePathname()           // e.g. "/recipe/6856e6e..."
-  const recipeId = path.split("/").pop()!
+  const router = useRouter();
+  const path = usePathname();
+  const recipeId = path.split("/").pop()!;
 
-  const [recipe, setRecipe] = useState<IRecipe | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [recipe, setRecipe] = useState<IRecipe | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!recipeId) return
+    if (!recipeId) return;
 
-    setLoading(true)
+    setLoading(true);
     fetchRecipe(recipeId)
-      .then((data) => {
-        setRecipe(data)
-        setError(null)
+      .then((result) => {
+        if (result.success) {
+          setRecipe(result.recipes); // 👈 Aquí sí seteamos sólo la receta (IRecipe)
+          setError(null);
+        } else {
+          setError("No se pudo cargar la receta.");
+        }
       })
       .catch((err) => {
-        console.error(err)
-        setError("No se pudo cargar la receta.")
+        console.error(err);
+        setError("No se pudo cargar la receta.");
       })
-      .finally(() => setLoading(false))
-  }, [recipeId])
+      .finally(() => setLoading(false));
+  }, [recipeId]);
 
   if (loading) {
-    return <div className="p-4">Cargando receta…</div>
+    return <div className="p-4">Cargando receta…</div>;
   }
 
   if (error || !recipe) {
@@ -46,7 +50,7 @@ export default function RecipeDetailPage() {
           ← Volver
         </button>
       </div>
-    )
+    );
   }
 
   return (
@@ -100,11 +104,10 @@ export default function RecipeDetailPage() {
         <ol className="list-decimal list-inside">
           {(recipe.steps ?? []).map((step, i) => (
             <li key={i}>{step}</li>
-            ))}
+          ))}
         </ol>
       </section>
 
-      {/* Links to comments and likes (you can wire these when those pages exist) */}
       <div className="flex space-x-4">
         <Link
           href={`/recipe/${recipe.id}/comments`}
@@ -120,5 +123,5 @@ export default function RecipeDetailPage() {
         </Link>
       </div>
     </div>
-  )
+  );
 }

@@ -46,8 +46,6 @@ export default function RecipesPage() {
     setUsernames(usernamesMap);
   };
 
-
-
   if (loading) return <div>Cargando recetas...</div>;
 
   return (
@@ -92,7 +90,7 @@ export default function RecipesPage() {
                 {/* Content Section */}
                 <div className="card-body d-flex flex-column">
                   <Link
-                    href={`/recipe/${recipe.id}`}
+                    href={`/recipes/${recipe.id}`}
                     className="card-title fs-4 fw-bold"
                   >
                     {recipe.title}

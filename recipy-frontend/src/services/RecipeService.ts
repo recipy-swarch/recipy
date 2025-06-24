@@ -36,6 +36,20 @@ class RecipeService {
     return data as IRecipe[];
   };
 
+ fetchRecipe = async(recipe_id: string): Promise<IRecipe> => {
+  const url = `${this.apiUrl}/recipe/graphql/recipes/${recipe_id}`
+  console.log("Fetching one recipe from:", url)
+  const response = await fetch(url, { method: "GET" })
+  if (!response.ok) {
+    const err = await response.text()
+    console.error("Error fetching recipe:", err)
+    throw new Error(`Error ${response.status}`)
+  }
+  const data = (await response.json()) as IRecipe
+  console.log("Received recipe:", data)
+  return data
+}
+
   fetchUserRecipes = async (userId: string): Promise<IRecipe[]> => {
     const response = await fetch(
       `${this.apiUrl}/graphql/get_recipebyuserNA/${userId}`, // <-- Usando el endpoint correcto sin auth

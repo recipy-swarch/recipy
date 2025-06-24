@@ -34,7 +34,8 @@ export default function RecipesPage() {
       uniqueUserIds.map(async (userId) => {
         try {
           const result = await getPublicProfile(userId);
-          usernamesMap[userId] = result.success ? result.profile.username : "Desconocido";
+          // Protegemos de que result.profile sea null o username undefined:
+          usernamesMap[userId] = result.profile?.username ?? "Desconocido";
         } catch (error) {
           console.error(`Error fetching username for user ${userId}:`, error);
           usernamesMap[userId] = "Desconocido";
@@ -44,6 +45,8 @@ export default function RecipesPage() {
 
     setUsernames(usernamesMap);
   };
+
+
 
   if (loading) return <div>Cargando recetas...</div>;
 

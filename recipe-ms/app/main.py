@@ -685,3 +685,35 @@ async def rest_likes_count(recipe_id: str):
     coll_likes = get_collection("likes")
     cnt = await coll_likes.count_documents({"recipe_id": recipe_id})
     return cnt
+@app.get(
+    "/graphql/has_liked",
+    response_model=bool,
+    responses={
+        400: {"description": "Bad Request: recipe_id inválido o ausente"},
+        401: {"description": "Unauthorized"},
+        404: {"description": "Not Found: receta no existe"}
+    }
+)
+async def rest_has_liked(request: Request, recipe_id: str):
+    # 1) Validar recipe_id presente
+    if not recipe_id:
+        raise HTTPException(400, detail="Falta el parámetro `recipe_id`")
+    # 2) Validar formato ObjectId
+    try:
+        oid = ObjectId(recipe_id)
+    except Exception:
+        raise HTTPException(400, detail="`recipe_id` no es un ID válido")
+    # 3) Verificar que exista la receta
+    coll_recipes = get_collection("recipes")
+    if not await coll_recipes.find_one({"_id": oid}):
+        raise HTTPException(404, detail="Receta no existe")
+    # 4) Autenticación: extraer user_id
+    try:
+        info = type("Info", (), {"context": {"request": request}})
+        user_id = get_current_user_id(info)
+    except HTTPException as e:
+        raise e
+    # 5) Consultar si ya hay like
+    coll_likes = get_collection("likes")
+    exists = await coll_likes.find_one({"recipe_id": recipe_id, "user_id": user_id})
+    return bool(exists)

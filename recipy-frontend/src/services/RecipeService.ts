@@ -1,5 +1,6 @@
 import { IRecipe } from "@/interfaces/IRecipe";
-
+import { IComments } from "@/interfaces/IComments";
+import { ILike  } from "@/interfaces/ILike";
 class RecipeService {
   private apiUrl: string;
 
@@ -38,17 +39,33 @@ class RecipeService {
 
   fetchRecipe = async (recipe_id: string): Promise<IRecipe> => {
     const url = `${this.apiUrl}/recipe/graphql/recipes/${recipe_id}`;
-    console.log("Fetching one recipe from:", url);
-    const response = await fetch(url, { method: "GET" });
-    if (!response.ok) {
-      const err = await response.text();
-      console.error("Error fetching recipe:", err);
-      throw new Error(`Error ${response.status}`);
-    }
-    const data = (await response.json()) as IRecipe;
-    console.log("Received recipe:", data);
+      console.log("Fetching one recipe from:", url);
+      const response = await fetch(url, { method: "GET" });
+        if (!response.ok) {
+          const err = await response.text();
+          console.error("Error fetching recipe:", err);
+          throw new Error(`Error ${response.status}`);
+        }
+      const data = (await response.json()) as IRecipe;
     return data;
   };
+
+  fetchComments = async (recipe_id: string): Promise<IComments[]> => {
+    const url = `${this.apiUrl}/recipe/graphql/comments_recipes/${recipe_id}`;
+    console.log("Fetching comments from:", url);
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("Error fetching comments:", text);
+      throw new Error(`Error ${response.status}`);
+    }
+    const data = await response.json();
+    // Esperamos un array con shape IComments[]
+    return data as IComments[];
+  }
 
   fetchUserRecipes = async (userId: string): Promise<IRecipe[]> => {
     const response = await fetch(
@@ -119,6 +136,76 @@ class RecipeService {
 
     return data_r as IRecipe;
   };
+    // 1) POST: dar like
+  likeRecipe = async(recipeId: string, token?: string): Promise<ILike> => {
+    const url = `${this.apiUrl}/recipe/graphql/like_recipe?recipe_id=${recipeId}`;
+    const headers: Record<string,string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers,
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error("Error likeRecipe:", text);
+      throw new Error(`Error ${resp.status}: ${text}`);
+    }
+    const data = await resp.json();
+    // data debe cumplir shape de ILike
+    return data as ILike;
+  }
+
+  // 2) DELETE: quitar like
+  unlikeRecipe = async (recipeId: string, token?: string): Promise<void> => {
+    const url = `${this.apiUrl}/recipe/graphql/unlike_recipe?recipe_id=${recipeId}`;
+    const headers: Record<string,string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const resp = await fetch(url, {
+      method: "DELETE",
+      headers,
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error("Error unlikeRecipe:", text);
+      throw new Error(`Error ${resp.status}: ${text}`);
+    }
+    // 204 No Content: no devolvemos body
+  }
+
+  // 3) GET: número de likes
+  getLikesCount = async (recipeId: string): Promise<number> =>{
+    const url = `${this.apiUrl}/recipe/graphql/likes_count?recipe_id=${recipeId}`;
+    const resp = await fetch(url, {
+      method: "GET",
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error("Error getLikesCount:", text);
+      throw new Error(`Error ${resp.status}: ${text}`);
+    }
+    // El response_model es int, así que JSON.parse resp.json() devolaría un número
+    const data = await resp.json();
+    // data es un número: 
+    return data as number;
+  }
+
+  // 4) GET: saber si ya dio like (opcional, si implementaste el endpoint)
+  hasLiked = async (recipeId: string, token?: string): Promise<boolean> => {
+    const url = `${this.apiUrl}/recipe/graphql/has_liked?recipe_id=${recipeId}`;
+    const headers: Record<string,string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const resp = await fetch(url, {
+      method: "GET",
+      headers,
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error("Error hasLiked:", text);
+      throw new Error(`Error ${resp.status}: ${text}`);
+    }
+    const data = await resp.json();
+    return data as boolean;
+  }
 }
 
 const recipeService = new RecipeService();

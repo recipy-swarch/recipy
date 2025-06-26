@@ -28,13 +28,8 @@ func main() {
         log.Fatalf("Error cargando configuración: %s", err)
     }
 
-    // 1) Esperar a que RabbitMQ esté disponible
     waitRabbit(cfg.AMQPURL)
 
-    // 2) Arrancar consumidor AMQP y servidor REST
-    go startAMQPConsumer(cfg)
-    go startRESTServer(cfg)
-
-    log.Println("mail-ms escuchando en puerto interno 8080 (REST + AMQP)")
-    select {} // bloquear el proceso principal indefinidamente
+    log.Println("Iniciando consumidor AMQP en cola 'send-email'")
+    startAMQPConsumer(cfg)
 }

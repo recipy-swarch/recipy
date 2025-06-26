@@ -14,6 +14,7 @@
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
             minikube
+            kompose
             kubernetes-helm
             jq
           ];
@@ -37,9 +38,9 @@
               echo "✅ Clúster Minikube detectado"
               # Si el clúster está corriendo, aplicar docker-env
               if [ "$(minikube status -o json | jq -r .Host)" = "Running" ]; then
-                echo "🔄 Aplicando configuración docker-env con sudo..."
-                sudo -E minikube -p minikube docker-env | while read -r line; do eval "$line"; done
                 . <(kubectl completion bash)
+                echo "🔄 Aplicando 'eval \$(minikube docker-env)' (usa Docker dentro del clúster)..."
+                eval "$(minikube -p minikube docker-env)"
               else
                 echo "⚠️  Minikube está detenido. Ejecuta:"
                 echo "    minikube start --driver=docker"

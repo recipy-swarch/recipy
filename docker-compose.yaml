@@ -183,6 +183,23 @@ services:
       - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt
       - ./certs/recipy.key:/etc/ssl/private/recipy.key
     ports:
+      - "81:80" # Aquí tocó poner 81 y 444 ya que tenemos otro nginx, y perdon por priorizar el front antes que el back Jhon, se que te duele
+      - "444:443"
+    env_file:
+      - .env
+    entrypoint: ["/entrypoint.sh"]
+    networks:
+      - frontend
+
+  recipy-waf:
+    image: nginx:alpine
+    container_name: recipy-waf
+    volumes:
+      - ./recipy-waf/default.conf.template:/etc/nginx/conf.d/default.conf.template
+      - ./recipy-waf/entrypoint.sh:/entrypoint.sh
+      - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt
+      - ./certs/recipy.key:/etc/ssl/private/recipy.key
+    ports:
       - "80:80"
       - "443:443"
     env_file:

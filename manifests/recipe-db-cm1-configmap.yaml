@@ -1,0 +1,61 @@
+apiVersion: v1
+data:
+  00-create-user.js: |-
+    db = db.getSiblingDB(process.env.MONGO_INITDB_DATABASE);
+
+    db.createUser({
+      user: process.env.RECIPE_USER,
+      pwd:  process.env.RECIPE_PWD,
+      roles: [
+        { role: "readWrite", db: process.env.MONGO_INITDB_DATABASE }
+      ]
+    });
+  01-init-recipes.js: |
+    // Selecciona la base de datos "recipy"
+    db = db.getSiblingDB('recipy');
+
+    // Asegura la colección (la crea si no existe)
+    db.createCollection('recipes');
+
+    // Índice por fecha de creación (descendente)
+    db.recipes.createIndex({ created_at: -1 });
+
+    // Índices de texto para búsquedas por título, descripción e ingredientes
+    db.recipes.createIndex(
+      { title: "text", description: "text", ingredients: "text" },
+      { default_language: "spanish" }
+    );
+
+    // (Opcional) Precarga de documentos de ejemplo
+  02-init-comments.js: |
+    // 02-init-comments.js
+    db = db.getSiblingDB('recipy');                  // Cambia a la BD "recipy"
+
+    // Asegura la colección "comentarios"
+    db.createCollection('comments');
+
+    // Índice para consultar comentarios por receta
+    db.comments.createIndex({ recipe_id: 1 });
+
+    // Índice para consultar respuestas anidadas
+    db.comments.createIndex({ parent_id: 1 });
+
+    // (Opcional) Índice por usuario
+    db.comments.createIndex({ user_id: 1 });
+  03-init-likes.js: |
+    // Selecciona la base de datos "recipy"
+    db = db.getSiblingDB('recipy');
+
+    // Crea la colección "likes" si no existe
+    db.createCollection('likes');
+
+    // Índice para buscar “me gusta” por receta
+    db.likes.createIndex({ recipe_id: 1 });
+
+    // Índice para buscar “me gusta” por usuario
+    db.likes.createIndex({ user_id: 1 });
+kind: ConfigMap
+metadata:
+  labels:
+    io.kompose.service: recipe-db
+  name: recipe-db-cm1

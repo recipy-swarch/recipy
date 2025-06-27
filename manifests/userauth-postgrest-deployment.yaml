@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.version: 1.36.0 (HEAD)
+  labels:
+    io.kompose.service: userauth-postgrest
+  name: userauth-postgrest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: userauth-postgrest
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose --file docker-compose.yaml convert
+        kompose.version: 1.36.0 (HEAD)
+      labels:
+        io.kompose.service: userauth-postgrest
+    spec:
+      containers:
+        - envFrom:
+            - configMapRef:
+                name: env
+          image: postgrest/postgrest:v13.0.0
+          name: userauth-postgrest
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/postgrest.conf
+              name: userauth-postgrest-cm0
+              readOnly: true
+              subPath: postgrest.conf
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            items:
+              - key: postgrest.conf
+                path: postgrest.conf
+            name: userauth-postgrest-cm0
+          name: userauth-postgrest-cm0

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.version: 1.36.0 (HEAD)
+  labels:
+    io.kompose.service: image-ms
+  name: image-ms
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: image-ms
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose --file docker-compose.yaml convert
+        kompose.version: 1.36.0 (HEAD)
+      labels:
+        io.kompose.service: image-ms
+    spec:
+      containers:
+        - envFrom:
+            - configMapRef:
+                name: env
+          image: image-ms
+          name: image-ms
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /app/wwwroot/uploads
+              name: image-ms-cm0
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            name: image-ms-cm0
+          name: image-ms-cm0

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.version: 1.36.0 (HEAD)
+  labels:
+    io.kompose.service: userauth-db
+  name: userauth-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: userauth-db
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose --file docker-compose.yaml convert
+        kompose.version: 1.36.0 (HEAD)
+      labels:
+        io.kompose.service: userauth-db
+    spec:
+      containers:
+        - envFrom:
+            - configMapRef:
+                name: env
+          image: postgres:17.5-alpine3.21
+          name: userauth-db
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /docker-entrypoint-initdb.d
+              name: userauth-db-cm1
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            name: userauth-db-cm1
+          name: userauth-db-cm1

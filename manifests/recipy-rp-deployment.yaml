@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.version: 1.36.0 (HEAD)
+  labels:
+    io.kompose.service: recipy-rp
+  name: recipy-rp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: recipy-rp
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose --file docker-compose.yaml convert
+        kompose.version: 1.36.0 (HEAD)
+      labels:
+        io.kompose.service: recipy-rp
+    spec:
+      containers:
+        - command:
+            - /entrypoint.sh
+          envFrom:
+            - configMapRef:
+                name: env
+          image: nginx:alpine
+          name: recipy-rp
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/nginx/conf.d/default.conf.template
+              name: recipy-rp-cm0
+              subPath: default.conf.template
+            - mountPath: /entrypoint.sh
+              name: recipy-rp-cm1
+              subPath: entrypoint.sh
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            items:
+              - key: default.conf.template
+                path: default.conf.template
+            name: recipy-rp-cm0
+          name: recipy-rp-cm0
+        - configMap:
+            items:
+              - key: entrypoint.sh
+                path: entrypoint.sh
+            name: recipy-rp-cm1
+          name: recipy-rp-cm1

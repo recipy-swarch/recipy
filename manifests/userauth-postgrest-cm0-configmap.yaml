@@ -1,0 +1,22 @@
+apiVersion: v1
+data:
+  postgrest.conf: |
+    # Conexión a la base de datos
+    db-uri        = "${PGRST_DB_URI}"
+    db-schema     = "${PGRST_DB_SCHEMA}"
+    db-anon-role  = "${PGRST_DB_ANON_ROLE}"
+
+    # Puerto de escucha
+    server-port   = ${PGRST_SERVER_PORT}
+
+    # JWT
+    jwt-secret     = "${PGRST_JWT_SECRET}"
+    jwt-aud        = "postgrest"   # opcional: audiencias permitidas
+    jwt-role-claim = "role"        # extrae rol desde el claim 'role'
+kind: ConfigMap
+metadata:
+  annotations:
+    use-subpath: "true"
+  labels:
+    io.kompose.service: userauth-postgrest
+  name: userauth-postgrest-cm0

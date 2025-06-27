@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.version: 1.36.0 (HEAD)
+  labels:
+    io.kompose.service: userauth-ms
+  name: userauth-ms
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: userauth-ms
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose --file docker-compose.yaml convert
+        kompose.version: 1.36.0 (HEAD)
+      labels:
+        io.kompose.service: userauth-ms
+    spec:
+      containers:
+        - envFrom:
+            - configMapRef:
+                name: env
+          image: userauth-ms
+          name: userauth-ms
+          ports:
+            - containerPort: 5000
+              protocol: TCP
+      restartPolicy: Always

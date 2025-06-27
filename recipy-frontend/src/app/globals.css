@@ -1,40 +1,38 @@
 :root {
   /* main colors */
-  --background: #2E2127;
-  --nav-fot: #201A1D;
+  --background: #2e2127;
+  --nav-fot: #201a1d;
   --footer: #100d0f;
   /* text colors */
-  --title: #DDBCE5;
-  --text: #FFFFFF;
+  --title: #ddbce5;
+  --text: #ffffff;
   /* container */
-  --main-container: #514D52;
+  --main-container: #514d52;
   /* comments */
-  --comment-stroke: #C489A1;
-  --comment-container: #2A232F;
-  --comment-title: #FFFFFF;
-  --comment-text: #C6C6C6;
+  --comment-stroke: #c489a1;
+  --comment-container: #2a232f;
+  --comment-title: #ffffff;
+  --comment-text: #c6c6c6;
   /* buttons */
-  --main-button: #C489A1;
-  --main-button-text: #2E2127;
+  --main-button: #c489a1;
+  --main-button-text: #2e2127;
 
-  --main-button-text-hover: #FFFFFF;
+  --main-button-text-hover: #ffffff;
 
-  --main-button-sel: #55293B;
-  --main-button-sel-text: #FFFFFF;
+  --main-button-sel: #55293b;
+  --main-button-sel-text: #ffffff;
 
   --special-button: #ae7534;
-  --special-button-hover: #C2823A;
+  --special-button-hover: #c2823a;
 
-  --negative-button: #A9393B;
-  --negative-button-color: #CC4346;
+  --negative-button: #a9393b;
+  --negative-button-color: #cc4346;
   /* input color */
-  --input: #C9BCCE;
-  --input-text: #201A1D;
+  --input: #c9bcce;
+  --input-text: #201a1d;
   /* popup color */
-  --popup-container: #55293B;
+  --popup-container: #55293b;
 }
-
-
 
 html,
 body {
@@ -55,7 +53,6 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-
 
 main.container-fluid {
   flex: 1;
@@ -88,12 +85,23 @@ a {
   background-color: var(--main-container);
   border-color: none;
 }
+.comment-card {
+  background-color: var(--comment-container);
+  border: 1px solid var(--comment-stroke);
+  border-radius: 8px;
+  color: var(--comment-text);
+}
+.list-group-item {
+  background-color: var(--main-container);
+  border-color: var(--main-container);
+  color: var(--text);
+}
 
 .btn {
   background-color: var(--main-button);
   color: var(--main-button-text);
   border-color: none;
-  padding:.75rem 1rem;
+  padding: 0.75rem 1rem;
 
   a {
     color: var(--main-button-text);
@@ -151,7 +159,6 @@ a {
   background-color: var(--input);
   border-color: transparent;
   color: var(--input-text);
-
 }
 
 .form-control:focus {
@@ -164,4 +171,3 @@ a {
 .react-datepicker-wrapper {
   display: block !important;
 }
-

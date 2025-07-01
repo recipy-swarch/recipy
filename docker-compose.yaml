@@ -91,7 +91,7 @@ services:
     networks:
       - backend
 
-# PostgreSQL for userauth-tokens
+  # PostgreSQL for userauth-tokens
   token-db:
     build:
       context: ./token-db
@@ -102,14 +102,15 @@ services:
       - .env
     environment:
       # Estas tres variables son las que usa postgres:17.5-alpine para crear la BD
-      POSTGRES_USER:   ${TOKEN_DB_USER}
+      POSTGRES_USER: ${TOKEN_DB_USER}
       POSTGRES_PASSWORD: ${TOKEN_DB_PASSWORD}
-      POSTGRES_DB:     ${TOKEN_DB_NAME}
+      POSTGRES_DB: ${TOKEN_DB_NAME}
     volumes:
       - ./token-db/data:/var/lib/postgresql/data
       - ./token-db/initdb:/docker-entrypoint-initdb.d:ro
     ports:
-      - "5433:5432"
+      # - "5433:5432" en el local de sergio no funciona este puerto porque esta ocupado, cambio probicional a - "5434:5432"
+      - "5434:5432"
     networks:
       - backend
 
@@ -119,12 +120,12 @@ services:
     container_name: userauth-postgrest
     restart: always
     env_file:
-       - .env
+      - .env
     volumes:
       - ./userauth-postgrest/postgrest.conf:/etc/postgrest.conf:ro
       #- ./recipe-db/data:/data/db  # Persistencia de datos
       #- ./recipe-db/initdb:/docker-entrypoint-initdb.d:ro # Comando de inicialización
-    
+
     ports:
       - "3001:3000"
     depends_on:
@@ -137,9 +138,9 @@ services:
     build:
       context: ./userauth-ms
     env_file:
-      - .env     # Apunta al .env de la raíz
+      - .env # Apunta al .env de la raíz
     ports:
-      - "5000:5000"   
+      - "5000:5000"
     depends_on:
       - userauth-postgrest
       - token-db
@@ -160,7 +161,7 @@ services:
     networks:
       - backend
       - frontend
-  
+
   # Image MS (ASP.NET Core Web API)
   image-ms:
     build:
@@ -230,11 +231,10 @@ services:
   mailhog:
     image: mailhog/mailhog
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # UI web
+      - "1025:1025" # SMTP
+      - "8025:8025" # UI web
     networks:
       - backend
-
 
   # Servicio de correo asíncrono
   mail-ms:
@@ -244,7 +244,7 @@ services:
     ports:
       - "8085:8080"
     env_file:
-      - .env      # Carga MAIL_SMTP_* y AMQP_URL
+      - .env # Carga MAIL_SMTP_* y AMQP_URL
     depends_on:
       - mail-broker
     networks:
@@ -257,15 +257,14 @@ services:
     container_name: mail-broker
     restart: always
     ports:
-      - "5672:5672"    # AMQP
-      - "15672:15672"  # Management UI
+      - "5672:5672" # AMQP
+      - "15672:15672" # Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       backend:
         aliases:
-          - rabbitmq   # para tests de userauth-ms
-
+          - rabbitmq # para tests de userauth-ms
 
 volumes:
   rabbitmq_data:
@@ -275,4 +274,3 @@ networks:
   frontend:
   backend:
     driver: bridge
-

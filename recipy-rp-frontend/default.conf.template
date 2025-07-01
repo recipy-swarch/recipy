@@ -19,6 +19,7 @@ server {
 
     # Proxy todas las rutas al frontend
     location / {
+        limit_req zone=myzone burst=10 nodelay;
         proxy_pass ${FRONTEND_URL};
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;

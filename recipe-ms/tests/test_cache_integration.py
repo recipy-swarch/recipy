@@ -1,19 +1,23 @@
-# Ejecutar este archivo de pruebas desde la terminal así:
-#cd recipe-ms
-#pytest tests/test_cache_integration.py
+# tests/test_cache_integration.py
+
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
-client = TestClient(app)
-
 @pytest.fixture(scope="module")
 def test_client():
-    # ensure the app is running with initial data seeded
-    yield client
+    # Arranca TestClient con startup/shutdown y seed de datos
+    with TestClient(app) as client:
+        # Inyectamos todas las cabeceras que tu código espera:
+        client.headers.update({
+            "x-user-id": "1",
+            "Authorization": "1",
+            "id": "1"
+        })
+        yield client
 
 def test_get_recipes_cache_miss_then_hit(test_client):
-    # First request: cache miss
+    # Primera llamada: cache MISS
     response = test_client.get("/graphql/get_recipes")
     assert response.status_code == 200
     assert response.headers.get("X-Cache") == "MISS"
@@ -21,7 +25,7 @@ def test_get_recipes_cache_miss_then_hit(test_client):
     assert isinstance(data1, list)
     assert len(data1) >= 1
 
-    # Second request: cache hit
+    # Segunda llamada: cache HIT
     response2 = test_client.get("/graphql/get_recipes")
     assert response2.status_code == 200
     assert response2.headers.get("X-Cache") == "HIT"
@@ -30,14 +34,14 @@ def test_get_recipes_cache_miss_then_hit(test_client):
 
 @pytest.mark.parametrize("user_id", ["1"])
 def test_get_recipes_by_user_cache_miss_then_hit(test_client, user_id):
-    # First request: miss
+    # Primera llamada por usuario: MISS
     response = test_client.get(f"/graphql/get_recipebyuserNA?user_id={user_id}")
     assert response.status_code == 200
     assert response.headers.get("X-Cache") == "MISS"
     data1 = response.json()
     assert isinstance(data1, list)
 
-    # Second request: hit
+    # Segunda llamada por usuario: HIT
     response2 = test_client.get(f"/graphql/get_recipebyuserNA?user_id={user_id}")
     assert response2.status_code == 200
     assert response2.headers.get("X-Cache") == "HIT"
@@ -45,7 +49,7 @@ def test_get_recipes_by_user_cache_miss_then_hit(test_client, user_id):
     assert data2 == data1
 
 def test_create_recipe_invalidates_cache(test_client):
-    # Create a new recipe (assumes user_id=1 seeded)
+    # Creamos una nueva receta (usa user_id=1 de las cabeceras)
     payload = {
         "title": "Test Recipe",
         "description": "desc",
@@ -56,20 +60,17 @@ def test_create_recipe_invalidates_cache(test_client):
         "steps": ["step1"],
         "user_id": 1
     }
-    # POST create
+
+    # POST a create_recipe → ahora debe devolver 201 Created
     response = test_client.post("/graphql/create_recipe", json=payload)
     assert response.status_code == 201
     new_recipe = response.json()
     assert new_recipe.get("id")
 
-    # After creation, global feed should be MISS again
+    # Tras crear, el feed global debería ser MISS de nuevo
     resp_feed = test_client.get("/graphql/get_recipes")
     assert resp_feed.headers.get("X-Cache") == "MISS"
 
-    # And user feed should also MISS
+    # Y el feed por usuario también debería ser MISS
     resp_user = test_client.get(f"/graphql/get_recipebyuserNA?user_id=1")
     assert resp_user.headers.get("X-Cache") == "MISS"
-
-    # Clean up: (optionally delete created recipe)
-    # client.delete(...) if implemented
-    # Tras cada ejecución del test no dejar datos residuales en MongoDB ni en Redis

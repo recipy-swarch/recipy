@@ -17,7 +17,7 @@ server {
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
 
-    # Proxy todas las rutas al API Gateway
+    # Proxy todas las rutas al frontend
     location / {
         proxy_pass ${FRONTEND_URL};
         proxy_set_header Host \$host;

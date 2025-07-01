@@ -17,18 +17,9 @@ server {
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
 
-    # Proxy todas las rutas al API Gateway
+    # Proxy todas las rutas al waf
     location / {
-        proxy_pass ${API_GATEWAY_URL};
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    # Proxy para _next (assets del frontend)
-    location /_next/ {
-        proxy_pass http://recipy-frontend:3000;
+        proxy_pass ${WAF_URL};
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;

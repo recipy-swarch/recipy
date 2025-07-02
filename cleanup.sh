@@ -32,9 +32,10 @@ function eliminar_bases_datos() {
 
 function corregir_permisos_image_ms() {
     echo "Corrigiendo permisos del volumen de la imagen recipe-ms..."
-    mkdir -p image-ms/uploads
-    sudo chown -R 1000:1000 image-ms/uploads
-    sudo chmod -R 777 image-ms/uploads
+    sudo rm -rf image-ms/uploads # Elimina el directorio uploads si existe, este es el nombre anterior
+    mkdir -p image-ms/image-uploads
+    sudo chown -R 1000:1000 image-ms/image-uploads
+    sudo chmod -R 777 image-ms/image-uploads
 }
 
 while true; do

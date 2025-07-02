@@ -167,7 +167,6 @@ services:
     build:
       context: ./image-ms
     deploy:
-      mode: replicated
       replicas: 3
     env_file:
       - .env

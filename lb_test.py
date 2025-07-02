@@ -1,25 +1,13 @@
-"""
-lb_test.py — Test de load‑balancing para image‑ms‑lb
-
-Este script:
- 1) Inicia un tail de logs en background para el servicio Docker Compose `image-ms`.
- 2) Espera un par de segundos para estabilizar el tail.
- 3) Lanza N peticiones concurrentes a la URL del balanceador.
- 4) Espera a que terminen todas las peticiones.
- 5) Da unos segundos extra para que los logs reflejen el tráfico.
- 6) Termina el proceso de tail de logs.
-"""
-
 import subprocess
 import time
 import requests
 import concurrent.futures
 import sys
-import os
 import signal
+from collections import Counter, defaultdict
 
 # 1) URL de tu load‑balancer para image‑ms
-LB_URL = "http://localhost:83/Image/user/1"
+LB_URL = "http://localhost:83/health"
 
 # 2) Servicio de Docker Compose a tail‑ear
 SERVICE = "image-ms"
@@ -28,14 +16,41 @@ SERVICE = "image-ms"
 COUNT = 1000
 
 def send_request(url: str):
-    """Envía una GET a la URL y descarta la respuesta."""
+    """
+    Envía una GET a la URL, mide la latencia, y extrae la réplica que responde.
+    Se asume que el endpoint /health devuelve JSON con un campo 'instance'
+    o envía un header 'X-Instance-ID'.
+    """
+    start = time.perf_counter()
     try:
-        requests.get(url, timeout=5)
-    except Exception:
-        pass  # ignoramos errores
+        resp = requests.get(url, timeout=5)
+        elapsed = (time.perf_counter() - start) * 1000  # ms
+        # Intentamos extraer la réplica desde el body JSON
+        replica = None
+        try:
+            data = resp.json()
+            replica = data.get("instance") or data.get("node")  # ajustar clave según implementación
+        except ValueError:
+            pass
+        # O desde la cabecera
+        if not replica:
+            replica = resp.headers.get("X-Instance-ID", "unknown")
+        return {
+            "status": resp.status_code,
+            "latency_ms": elapsed,
+            "replica": replica
+        }
+    except Exception as e:
+        elapsed = (time.perf_counter() - start) * 1000
+        return {
+            "status": None,
+            "latency_ms": elapsed,
+            "replica": "error",
+            "error": str(e)
+        }
 
 def main():
-    # 3.1) Arrancamos el tail de logs en background
+    # 1) Arrancamos el tail de logs en background
     print(f"📄 Iniciando tail de logs del servicio '{SERVICE}'…")
     log_proc = subprocess.Popen(
         ["docker", "compose", "logs", "-f", SERVICE],
@@ -43,28 +58,48 @@ def main():
         stderr=sys.stderr
     )
 
-    # 4) Pequeña espera para asegurar que el tail está activo
+    # 2) Pequeña espera para asegurar que el tail está activo
     time.sleep(2)
 
-    # 5) Lanzamos las peticiones concurrentes
+    # 3) Lanzamos las peticiones concurrentes
     print(f"🚀 Lanzando {COUNT} peticiones a {LB_URL}")
+    results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
-        # map espera a que todas las llamadas terminen
-        list(executor.map(lambda _: send_request(LB_URL), range(COUNT)))
+        futures = [executor.submit(send_request, LB_URL) for _ in range(COUNT)]
+        for fut in concurrent.futures.as_completed(futures):
+            results.append(fut.result())
 
-    # 6) Un par de segundos más para que aparezcan los últimos logs
+    # 4) Un par de segundos más para que aparezcan los últimos logs
     time.sleep(2)
 
-    # 7) Detenemos el tail de logs
+    # 5) Detenemos el tail de logs
     print("🛑 Deteniendo tail de logs")
-    # Enviamos SIGINT primero para un cierre más limpio
     log_proc.send_signal(signal.SIGINT)
-    # si sigue vivo, forzamos
     time.sleep(1)
     if log_proc.poll() is None:
         log_proc.kill()
 
-    print("✅ ¡Prueba completada!")
+    # 6) Resumen de resultados
+    latencies = [r["latency_ms"] for r in results if r["status"] is not None]
+    errors = [r for r in results if r["status"] is None]
+    by_replica = Counter(r["replica"] for r in results)
+
+    print("\n📊 Resumen de la prueba:")
+    print(f"Total peticiones: {len(results)}")
+    print(f"  Éxitos: {len(latencies)}")
+    print(f"  Errores: {len(errors)}")
+    if latencies:
+        print(f"Latency (ms): min={min(latencies):.1f}, max={max(latencies):.1f}, avg={sum(latencies)/len(latencies):.1f}")
+    print("\nDistribución por réplica:")
+    for replica, count in by_replica.items():
+        print(f"  {replica}: {count} peticiones")
+
+    if errors:
+        print("\nAlgunos errores:")
+        for e in errors[:5]:
+            print(f"  Error en petición: {e.get('error')} (lat {e['latency_ms']:.1f} ms)")
+
+    print("\n✅ ¡Prueba completada!")
 
 if __name__ == "__main__":
     main()

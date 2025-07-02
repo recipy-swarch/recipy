@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+"""
+lb_test.py — Test de load‑balancing para image‑ms‑lb
+"""
 import subprocess
 import time
 import requests
@@ -50,6 +54,25 @@ def send_request(url: str):
         }
 
 def main():
+    # 0) Detectar y mostrar algoritmo de balanceo en image‑rp‑lb
+    print("🔍 Consultando configuración de NGINX en 'image‑rp‑lb'…")
+    try:
+        conf = subprocess.check_output(
+            ["docker", "compose", "exec", "-T", "image-rp-lb", "nginx", "-T"],
+            stderr=subprocess.STDOUT
+        ).decode()
+        # Busca la línea upstream con la directiva least_conn
+        if "least_conn" in conf:
+            algo = "least_conn"
+        elif "ip_hash" in conf:
+            algo = "ip_hash"
+        else:
+            algo = "round_robin"  # default de NGINX
+        print(f"✅ Algoritmo de balanceo detectado: {algo}")
+    except subprocess.CalledProcessError as e:
+        print("⚠️ No se pudo extraer la configuración de NGINX:")
+        print(e.output.decode())
+
     # 1) Arrancamos el tail de logs en background
     print(f"📄 Iniciando tail de logs del servicio '{SERVICE}'…")
     log_proc = subprocess.Popen(

@@ -1,24 +1,26 @@
+
 # 1) Imagen base ultraligera con Python y Alpine
-FROM python:3.11-alpine
+#FROM python:3.11-alpine
 
 # 2) Variables de entorno útiles
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+#ENV PYTHONUNBUFFERED=1 \
+#    PYTHONDONTWRITEBYTECODE=1
 
 # 3) Instala OpenSSL (CLI + dev) y herramientas de compilación
-RUN apk update && \
-    apk add --no-cache \
+#RUN apk update && \
+#    apk add --no-cache \
       # OpenSSL runtime y utilidades
-      openssl \
-      ca-certificates \
+#      openssl \
+#      ca-certificates \
       # Librerías de desarrollo para compilar extensiones Python que usen crypto/u otros C-modules
-      libressl-dev \
-      musl-dev \
-      gcc \
+#      libressl-dev \
+#     musl-dev \
+#      gcc \
       # Libffi para muchos paquetes de cifrado
-      libffi-dev && \
+ #     libffi-dev && \
     # Actualiza el store de certificados
-    update-ca-certificates
+#    update-ca-certificates
+FROM python:3.11-slim
 
 WORKDIR /app
 

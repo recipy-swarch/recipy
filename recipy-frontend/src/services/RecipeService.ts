@@ -5,11 +5,10 @@ class RecipeService {
   private apiUrl: string;
 
   constructor() {
-    // NEXT_PUBLIC_API_GATEWAY_URL ya está expuesta al bundle cliente
-    this.apiUrl = process.env.API_GATEWAY_URL || "";
+    this.apiUrl = process.env.WAF_URL || "";
     console.log("API (cliente) apuntando a:", this.apiUrl);
     if (!this.apiUrl) {
-      throw new Error("NEXT_PUBLIC_API_GATEWAY_URL no está definido");
+      throw new Error("WAF_URL no está definido");
     }
   }
   fetchAllRecipes = async (): Promise<IRecipe[]> => {

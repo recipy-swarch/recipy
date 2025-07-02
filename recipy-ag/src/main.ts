@@ -125,7 +125,7 @@ async function bootstrap() {
     (req: any, _res: any, next: any) => {
       console.log('--- [RECIPE] Incoming request ---');
       console.log('Headers:', req.headers);
-      //console.log('Body:', req.body);
+      console.log('Body:', req.body);
       next();
     },
     addUserIdHeader,               // <-- idem
@@ -136,8 +136,8 @@ async function bootstrap() {
     (req: any, _res: any, next: any) => {
       console.log('--- [RECIPE] Modified request ---');
       console.log('Headers:', req.headers);
-      //console.log('Body:', req.body);
-      //console.log('RawBody:', req.rawBody);
+      console.log('Body:', req.body);
+      console.log('RawBody:', req.rawBody);
       next();
     },
     createProxyMiddleware({

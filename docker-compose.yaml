@@ -171,23 +171,59 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./image-ms/uploads:/app/wwwroot/uploads
+      - ./image-ms/image-uploads:/app/wwwroot/uploads
     networks:
       - backend
 
-  recipy-rp:
+  recipy-rp-app:
     image: nginx:alpine
-    container_name: recipy-rp
+    container_name: recipy-rp-app
     volumes:
-      - ./recipy-rp/default.conf.template:/etc/nginx/conf.d/default.conf.template
-      - ./recipy-rp/entrypoint.sh:/entrypoint.sh
+      - ./recipy-rp-app/default.conf.template:/etc/nginx/conf.d/default.conf.template
+      - ./recipy-rp-app/entrypoint.sh:/entrypoint.sh
+      - ./recipy-rp-app/nginx.conf:/etc/nginx/nginx.conf
+      - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt
+      - ./certs/recipy.key:/etc/ssl/private/recipy.key
     ports:
-      - "80:80"
+      - "81:80" # Aquí tocó poner 81 y 444 ya que tenemos otro nginx, y perdon por priorizar el front antes que el back Jhon, se que te duele
+      - "444:443"
     env_file:
       - .env
     entrypoint: ["/entrypoint.sh"]
-    #depends_on:
-    #  - recipy-ag
+    depends_on:
+      - recipy-waf
+    networks:
+      - frontend
+
+  recipy-rp-frontend:
+    image: nginx:alpine
+    container_name: recipy-rp-frontend
+    volumes:
+      - ./recipy-rp-frontend/default.conf.template:/etc/nginx/conf.d/default.conf.template
+      - ./recipy-rp-frontend/entrypoint.sh:/entrypoint.sh
+      - ./recipy-rp-frontend/nginx.conf:/etc/nginx/nginx.conf
+      - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt
+      - ./certs/recipy.key:/etc/ssl/private/recipy.key
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file:
+      - .env
+    entrypoint: ["/entrypoint.sh"]
+    depends_on:
+      - recipy-frontend
+    networks:
+      - frontend
+
+  recipy-waf:
+    image: owasp/modsecurity-crs:nginx-alpine
+    container_name: recipy-waf
+    #volumes:
+    #  - ./recipy-waf/rules:/etc/modsecurity.d/owasp-crs/rules:ro # Este volumen por alguna razón no funciona, iguamente usaremos las reglas por defecto de OWASP CRS
+    depends_on:
+      - recipy-ag
+    environment:
+      BACKEND: "http://recipy-ag:3030" #Esta es la forma en que se pone la variable de entorno en el contenedor, no se puede usar el .env lastimosamente
     networks:
       - frontend
 

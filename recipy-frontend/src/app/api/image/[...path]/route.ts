@@ -12,7 +12,7 @@ export async function GET(
   req: NextRequest,
   { params }: Props
 ) {
-  const backendBaseUrl = process.env.API_GATEWAY_URL;
+  const backendBaseUrl = process.env.WAF_URL;
   if (!backendBaseUrl) return NextResponse.error();
 
   // params.path ya es string[]

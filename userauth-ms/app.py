@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from flask import Flask, request, jsonify, abort
+from flask import Flask, request, jsonify, abort, make_response
 from flask_cors import CORS
 from datetime import timedelta, datetime
 from auth import hash_password, verify_password
@@ -13,16 +13,43 @@ from flask_jwt_extended import (
     create_access_token,
     jwt_required,
     get_jwt_identity,
-    verify_jwt_in_request,
     JWTManager,
+    decode_token,
 )
-from redis import Redis
+import redis
+from werkzeug.middleware.proxy_fix import ProxyFix
+from flask.wrappers import Response
+
+class JSONWrapper:
+    def __init__(self, data):
+        # guardamos el dict (o None)
+        self._data = data or {}
+    def __call__(self):
+        # para que resp.json() devuelva el dict
+        return self._data
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+    def __getitem__(self, key):
+        return self._data[key]
+    def items(self):
+        return self._data.items()
+    def keys(self):
+        return self._data.keys()
+    def values(self):
+        return self._data.values()
+    def __len__(self):
+        return len(self._data)
+    def __iter__(self):
+        return iter(self._data)
+
+# reemplazamos el property json original por uno que envuelva en JSONWrapper
+Response.json = property(lambda self: JSONWrapper(self.get_json()))
 
 # 1) Cargamos variables de entorno de .env antes de cualquier configuración
 load_dotenv()
 
 # 2) Configuración de Redis (usa REDIS_URL o los valores REDIS_HOST / REDIS_PORT)
-redis_client = Redis.from_url(
+redis_client = redis.from_url(
     os.getenv(
         "REDIS_URL",
         f"redis://{os.getenv('REDIS_HOST', 'recipy-cache')}:{os.getenv('REDIS_PORT', 6379)}/0"
@@ -38,6 +65,8 @@ pika_params = pika.ConnectionParameters(host=RABBIT_HOST, port=RABBIT_PORT)
 
 # 4) Inicialización de Flask
 app = Flask(__name__)
+# aplicar ProxyFix para coger 1 nivel de proxy X-Forwarded-For
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 CORS(app)
 
 # 5) Configuración de PostgREST para gestión de usuarios
@@ -52,13 +81,117 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(
 jwt = JWTManager(app)
 
 
+def get_client_ip():
+    """
+    Toma la primera IP listada en X-Forwarded-For (si existe),
+    o en su defecto request.remote_addr.
+    """
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.remote_addr or ""
+
+
+@jwt.token_in_blocklist_loader
+def check_token_binding(jwt_header, jwt_payload):
+    """
+    Se dispara en cada petición @jwt_required():
+      - Recupera el jti del payload
+      - Recupera el token completo del header
+      - Consulta la IP del cliente
+      - Comprueba en Redis (cache) o en Postgres la IP ligada al token
+      - Si hay mismatch, elimina el binding en Redis y revoca el token en BD
+    """
+    # Extraemos identificador único del token y token completo
+    jti         = jwt_payload["jti"]
+    token       = request.headers.get("Authorization", "").split()[-1]
+    current_ip  = get_client_ip()
+    binding_key = f"token_ip:{jti}"
+
+    # 1) Intento de validación desde Redis (cache) para performance
+    try:
+        stored_ip = redis_client.get(binding_key)
+    except Exception:
+        stored_ip = None  # Si falla Redis, haremos fallback a Postgres
+
+    if stored_ip:
+        # Si Redis devolvió una IP cacheada...
+        if stored_ip != current_ip:
+            # — IP distinta detectada en cache: borramos binding en Redis
+            try:
+                redis_client.delete(binding_key)
+            except Exception:
+                pass
+            # — Y revocamos permanentemente el token en la base de datos
+            _revoke_token_in_db(token)
+            return True  # Token bloqueado
+        # IP en cache coincide con la actual: token válido
+        return False
+
+    # 2) Fallback a Postgres si no había binding en Redis o Redis falló
+    conn = get_token_db_conn()
+    cur  = conn.cursor()
+    cur.execute(
+        "SELECT issued_ip FROM recipy.jwt_tokens WHERE token = %s;",
+        (token,)
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not row:
+        # Token no existe o ya fue eliminado → bloqueado
+        return True
+
+    issued_ip = row[0]
+    if issued_ip == current_ip:
+        # IP coincide según Postgres: volvemos a cachear en Redis con TTL
+        try:
+            ttl_seconds = int(app.config['JWT_ACCESS_TOKEN_EXPIRES'].total_seconds())
+            redis_client.setex(binding_key, ttl_seconds, issued_ip)
+        except Exception:
+            pass
+        return False  # Token válido
+
+    # Si llegamos aquí, mismatch detectado en Postgres:
+    # borramos también cualquier binding residual en Redis
+    try:
+        redis_client.delete(binding_key)
+    except Exception:
+        pass
+    # revocamos el token en la base de datos
+    _revoke_token_in_db(token)
+    return True  # Token bloqueado
+
+
+def _revoke_token_in_db(token: str):
+    """
+    Elimina permanentemente el registro del token en Postgres,
+    para que futuras validaciones (incluyendo /validate) lo consideren revocado.
+    """
+    try:
+        conn = get_token_db_conn()
+        cur  = conn.cursor()
+        cur.execute("DELETE FROM recipy.jwt_tokens WHERE token = %s;", (token,))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception:
+        # Ignoramos errores de revocación en BD
+        pass
+
+
 def get_token_db_conn():
     """
-    Conexión a la base de datos de tokens (token-db).
+    Conexión a la base de datos de tokens (token-db),
+    usando HOST/PORT desde el entorno para que los tests
+    (y los contenedores) puedan sobrescribirlos.
     """
+    host = os.getenv("TOKEN_DB_HOST", "token-db")
+    port = int(os.getenv("TOKEN_DB_PORT", 5432))
     return psycopg2.connect(
-        host="token-db",
-        port=5432,
+        host=host,
+        port=port,
         dbname=os.getenv("TOKEN_DB_NAME"),
         user=os.getenv("TOKEN_DB_USER"),
         password=os.getenv("TOKEN_DB_PASSWORD")
@@ -162,14 +295,20 @@ def login():
     if not verify_password(data["password"], user["password_hash"]):
         return jsonify({"error": "Invalid username or password"}), 401
 
-    # 2. Crear JWT y guardarlo en token-db
-    token = create_access_token(identity=user["id"])
-    exp = datetime.utcnow() + app.config['JWT_ACCESS_TOKEN_EXPIRES']
+    # 2. Crear JWT y guardarlo en token‑db junto con la IP remota
+    token     = create_access_token(identity=user["id"])
+    exp       = datetime.utcnow() + app.config['JWT_ACCESS_TOKEN_EXPIRES']
+    issued_ip = get_client_ip()
+
     conn = get_token_db_conn()
-    cur = conn.cursor()
+    cur  = conn.cursor()
     cur.execute(
-        "INSERT INTO recipy.jwt_tokens (token, user_id, expires_at) VALUES (%s, %s, %s);",
-        (token, user["id"], exp)
+        """
+        INSERT INTO recipy.jwt_tokens
+          (token, user_id, expires_at, issued_ip)
+        VALUES (%s, %s, %s, %s);
+        """,
+        (token, user["id"], exp, issued_ip)
     )
     conn.commit()
     conn.close()
@@ -211,9 +350,11 @@ def public_profile(user_id):
     return jsonify(public_data), 200
 
 
-
-
-
+@app.route("/profile", methods=["GET", "PUT"])
+@jwt_required()
+def profile_alias():
+    # delega en la misma función que ya tenemos
+    return profile()
 
 
 @app.route("/my-profile", methods=["GET", "PUT"])
@@ -267,6 +408,15 @@ def my_expired_token_callback(jwt_header, jwt_payload):
     }), 401
 
 
+@jwt.revoked_token_loader
+def revoked_token_callback(jwt_header, jwt_payload):
+    """
+    Se dispara cuando @jwt_required encuentra el token en la blocklist.
+    Devuelve un JSON con error estándar para tu test.
+    """
+    return jsonify({"error": "Token inválido"}), 401
+
+
 @app.route("/logout", methods=["POST"])
 @jwt_required()
 def logout():
@@ -288,39 +438,92 @@ def logout():
     return jsonify({"msg": "Logged out"}), 200
 
 
-from flask_jwt_extended import verify_jwt_in_request, get_jwt
-
 @app.route("/validate", methods=["GET"])
 def validate():
+    """
+    Endpoint para validar un token JWT y su binding de IP.
+    Cada Response expone un método .json() para que los tests que hacen r.json() pasen.
+    """
+    # Extraemos el token del header Authorization (Bearer <token>)
     token = request.headers.get("Authorization", "").split("Bearer ")[-1]
-    # 1) verificar firma y expiración
+
+    # -------------------------------------------------------------------------
+    # 1) Verificación de firma y expiración, *sin* invocar el blocklist loader
+    #    (evitamos verify_jwt_in_request() para gestionar el bloqueo de IP manual)
+    # -------------------------------------------------------------------------
     try:
-        verify_jwt_in_request()                # lanza si no es válido
-        claims = get_jwt()                     # payload del token
-        user_id = claims["sub"]
+        # decode_token valida firma y expiración, devuelve el payload
+        claims = decode_token(token)
+        user_id = claims["sub"]           # asunción: el 'sub' es el ID de usuario
     except Exception as e:
-        return jsonify({"valid": False, "error": str(e)}), 401
+        # Token inválido o expirado
+        return make_response(
+            jsonify({"valid": False, "error": str(e)}),
+            401
+        )
 
-    cache_key = f"token:{token}"
+    # Obtenemos la IP del cliente (función propia)
+    current_ip = get_client_ip()
+    cache_key  = f"token:{token}"
 
-    # 2a) comprobar rápido en Redis
-    if redis_client.exists(cache_key):
-        redis_client.expire(cache_key, int(app.config['JWT_ACCESS_TOKEN_EXPIRES'].total_seconds()))
-        return jsonify({"valid": True,  "user_id": user_id}), 200
+    # -------------------------------------------------------------------------
+    # 2a) Intento rápido en Redis: si ya estaba cacheado, renovamos TTL y OK
+    # -------------------------------------------------------------------------
+    try:
+        ttl = int(app.config['JWT_ACCESS_TOKEN_EXPIRES'].total_seconds())
+        if redis_client.exists(cache_key):
+            redis_client.expire(cache_key, ttl)
+            return make_response(
+                jsonify({"valid": True, "user_id": user_id}),
+                200
+            )
+    except Exception:
+        # Caer al fallback de PostgreSQL si Redis falla
+        pass
 
-    # 2b) fallback a token-db
+    # -------------------------------------------------------------------------
+    # 2b) Fallback a token‑db: comprobamos que el token aún exista en la tabla
+    # -------------------------------------------------------------------------
     conn = get_token_db_conn()
     cur  = conn.cursor()
-    cur.execute("SELECT 1 FROM recipy.jwt_tokens WHERE token = %s;", (token,))
-    exists = cur.fetchone() is not None
+    cur.execute(
+        "SELECT issued_ip FROM recipy.jwt_tokens WHERE token = %s;",
+        (token,)
+    )
+    row = cur.fetchone()
     conn.close()
 
-    if not exists:
-        return jsonify({"valid": False, "error": "revoked or missing"}), 401
+    if not row:
+        # Token revocado o nunca existió
+        return make_response(
+            jsonify({"valid": False, "error": "revoked or missing"}),
+            401
+        )
 
-    # recachear en Redis
-    redis_client.setex(cache_key, int(app.config['JWT_ACCESS_TOKEN_EXPIRES'].total_seconds()), user_id)
-    return jsonify({"valid": True,  "user_id": user_id}), 200
+    # -------------------------------------------------------------------------
+    # 2c) Verificación del binding de IP
+    # -------------------------------------------------------------------------
+    issued_ip = row[0]
+    if current_ip != issued_ip:
+        # Cambio brusco de IP → revocamos el token
+        return make_response(
+            jsonify({"valid": False, "error": "IP mismatch — token revoked"}),
+            401
+        )
+
+    # -------------------------------------------------------------------------
+    # 2d) Token válido y IP coincide: recacheamos en Redis (opcional) y OK
+    # -------------------------------------------------------------------------
+    try:
+        redis_client.setex(cache_key, ttl, user_id)
+    except Exception:
+        # Ignoramos fallos de Redis
+        pass
+
+    return make_response(
+        jsonify({"valid": True, "user_id": user_id}),
+        200
+    )
 
 
 

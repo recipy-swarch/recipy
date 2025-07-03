@@ -8,7 +8,8 @@ CREATE TABLE jwt_tokens (
   token      TEXT      NOT NULL,
   user_id INT NOT NULL,
   issued_at  TIMESTAMP NOT NULL DEFAULT NOW(),
-  expires_at TIMESTAMP NOT NULL
+  expires_at TIMESTAMP NOT NULL,
+  issued_ip  TEXT      NOT NULL -- patrón 1.2.2.
 );
 
 CREATE INDEX idx_jwt_tokens_user  ON jwt_tokens(user_id);

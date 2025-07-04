@@ -38,6 +38,11 @@ function corregir_permisos_image_ms() {
     sudo chmod -R 777 image-ms/image-uploads
 }
 
+function correr_contenedores_build_detach() {
+    echo "Reconstruyendo e iniciando contenedores en background..."
+    sudo docker compose up --build -d
+}
+
 while true; do
     echo ""
     echo "Selecciona una opción:"
@@ -47,6 +52,7 @@ while true; do
     echo "4. Correr los contenedores"
     echo "5. Corregir permisos del volumen recipe-ms"
     echo "6. Eliminar bases de datos"
+    echo "7. Reconstruir y levantar contenedores en background"
     echo "0. Salir"
     read -p "Opción: " opcion
 
@@ -68,6 +74,9 @@ while true; do
             ;;
         6)
             eliminar_bases_datos
+            ;;
+        7)
+            correr_contenedores_build_detach
             ;;
         0)
             echo "Saliendo..."

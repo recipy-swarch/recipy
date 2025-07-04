@@ -70,7 +70,8 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 CORS(app)
 
 # 5) Configuración de PostgREST para gestión de usuarios
-PGRST = os.getenv("PGRST_URL", "").rstrip("/")  # ej: http://userauth-postgrest:3000
+PGRST = os.getenv("PGRST_URL_LOCAL",
+                  os.getenv("PGRST_URL", "")).rstrip("/") # ej: http://userauth-postgrest:3000
 HEADERS = {"Content-Type": "application/json"}
 
 # 6) Configuración de JWT
@@ -469,16 +470,36 @@ def validate():
     # -------------------------------------------------------------------------
     # 2a) Intento rápido en Redis: si ya estaba cacheado, renovamos TTL y OK
     # -------------------------------------------------------------------------
+    # 2a) intento rápido en Redis: comprueba token y binding de IP
     try:
         ttl = int(app.config['JWT_ACCESS_TOKEN_EXPIRES'].total_seconds())
         if redis_client.exists(cache_key):
-            redis_client.expire(cache_key, ttl)
-            return make_response(
-                jsonify({"valid": True, "user_id": user_id}),
-                200
+            # extraer el JTI del token actual
+            claims = get_jwt()
+            jti = claims["jti"]
+            binding_key = f"token_ip:{jti}"
+            stored_ip = redis_client.get(binding_key)
+            current_ip = get_client_ip()
+
+            if stored_ip == current_ip:
+                # renovamos ambos TTL
+                redis_client.expire(cache_key, ttl)
+                redis_client.expire(binding_key, ttl)
+                resp = make_response(
+                    jsonify({"valid": True, "user_id": user_id}),
+                    200
+                )
+                resp.json = lambda: resp.get_json()
+                return resp
+            # mismatch de IP → revocamos
+            resp = make_response(
+                jsonify({"valid": False, "error": "IP mismatch — token revoked"}),
+                401
             )
+            resp.json = lambda: resp.get_json()
+            return resp
     except Exception:
-        # Caer al fallback de PostgreSQL si Redis falla
+        # si falla Redis, caemos al fallback de Postgres
         pass
 
     # -------------------------------------------------------------------------

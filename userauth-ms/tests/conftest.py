@@ -2,11 +2,15 @@
 
 import os
 import sys
+
+# metemos userauth‑ms/ en el path antes de importar app.py
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pytest
 import importlib.util
 import psycopg2
 from dotenv import load_dotenv
-
+from app import app as flask_app
 # ----------------------------------------------------------------------------
 # Si Flask no está instalado, saltamos todos estos tests
 # ----------------------------------------------------------------------------
@@ -30,11 +34,17 @@ sys.path.insert(
 load_dotenv(dotenv_path=os.path.join(os.getcwd(), ".env"))
 
 # ----------------------------------------------------------------------------
+# Para tests locales: obligamos a usar Postgres en localhost:5432
+# ----------------------------------------------------------------------------
+os.environ.setdefault("POSTGRES_HOST", os.getenv("POSTGRES_HOST", "localhost"))
+os.environ.setdefault("POSTGRES_PORT", os.getenv("POSTGRES_PORT", "5432"))
+
+# ----------------------------------------------------------------------------
 # Fuerza las URLs y credenciales locales de PostgREST y Postgres
 # ----------------------------------------------------------------------------
 os.environ["PGRST_URL"] = os.getenv("PGRST_URL_LOCAL", "http://localhost:3001")
-os.environ.setdefault("POSTGRES_HOST", "localhost")
-os.environ.setdefault("POSTGRES_PORT", "5432")
+os.environ.setdefault("POSTGRES_HOST", os.getenv("POSTGRES_HOST", "userauth-db"))
+os.environ.setdefault("POSTGRES_PORT", os.getenv("POSTGRES_PORT", "5432"))
 os.environ.setdefault("POSTGRES_DB", os.getenv("POSTGRES_DB", "userauth_db"))
 os.environ.setdefault("POSTGRES_USER", os.getenv("POSTGRES_USER", "postgres"))
 os.environ.setdefault("POSTGRES_PASSWORD", os.getenv("POSTGRES_PASSWORD", ""))
@@ -63,6 +73,26 @@ def clean_users_table_once():
         conn.commit()
     finally:
         conn.close()
+
+# ------------------------------------------------------------
+# 1.b) Registrar un usuario de pruebas automáticamente
+#     así tenemos /register y /login cubiertos antes de todo
+# ------------------------------------------------------------
+@pytest.fixture(scope="session", autouse=True)
+def ensure_test_user_registered():
+    flask_app.config["TESTING"] = True
+    client = flask_app.test_client()
+    resp = client.post(
+        "/register",
+        json={
+            "name": "Fixture User",
+            "email": "fixture@example.com",
+            "username": "fixtureuser",
+            "password": "pass123"
+        }
+    )
+    # si ya estaba, nos vale el 409, si no, 201
+    assert resp.status_code in (201, 409)
 
 # ----------------------------------------------------------------------------
 # 2) Dummy RabbitMQ: evita llamadas reales a pika.BlockingConnection

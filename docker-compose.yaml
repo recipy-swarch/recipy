@@ -139,6 +139,10 @@ services:
       context: ./userauth-ms
     env_file:
       - .env # Apunta al .env de la raíz
+    environment:
+      POSTGRES_HOST: userauth-db
+      POSTGRES_PORT: "5432"
+      PGRST_URL_LOCAL: http://userauth-postgrest:3000
     ports:
       - "5000:5000"
     depends_on:

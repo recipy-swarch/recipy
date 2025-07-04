@@ -43,6 +43,11 @@ function correr_contenedores_build_detach() {
     sudo docker compose up --build -d
 }
 
+function bajar_todo() {
+    echo "Bajando servicios y eliminando redes y volúmenes huérfanos..."
+    sudo docker compose down --remove-orphans --volumes
+}
+
 while true; do
     echo ""
     echo "Selecciona una opción:"
@@ -53,6 +58,7 @@ while true; do
     echo "5. Corregir permisos del volumen recipe-ms"
     echo "6. Eliminar bases de datos"
     echo "7. Reconstruir y levantar contenedores en background"
+    echo "8. Baja todo (y elimina redes/volúmenes huérfanos)"
     echo "0. Salir"
     read -p "Opción: " opcion
 
@@ -81,6 +87,9 @@ while true; do
         0)
             echo "Saliendo..."
             break
+            ;;
+        8)
+            bajar_todo
             ;;
         *)
             echo "Opción inválida. Intenta nuevamente."

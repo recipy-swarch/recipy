@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import requests
 from flask import Flask, request, jsonify, abort, make_response
@@ -87,7 +88,8 @@ def get_client_ip():
     Toma la primera IP listada en X-Forwarded-For (si existe),
     o en su defecto request.remote_addr.
     """
-    xff = request.headers.get("X-Forwarded-For", "")
+    xff = request.headers.get("x-forwarded-for", "")
+    print("El header X-Forwarded-For es:", xff, file=sys.stderr)
     if xff:
         return xff.split(",")[0].strip()
     return request.remote_addr or ""
@@ -104,6 +106,7 @@ def check_token_binding(jwt_header, jwt_payload):
       - Si hay mismatch, elimina el binding en Redis y revoca el token en BD
     """
     # Extraemos identificador único del token y token completo
+    print("Validando token con JTI:", jwt_payload["jti"], file=sys.stderr)
     jti         = jwt_payload["jti"]
     token       = request.headers.get("Authorization", "").split()[-1]
     current_ip  = get_client_ip()
@@ -114,6 +117,8 @@ def check_token_binding(jwt_header, jwt_payload):
         stored_ip = redis_client.get(binding_key)
     except Exception:
         stored_ip = None  # Si falla Redis, haremos fallback a Postgres
+
+    print("IP almacenada en Redis:", stored_ip, file=sys.stderr)
 
     if stored_ip:
         # Si Redis devolvió una IP cacheada...
@@ -139,6 +144,8 @@ def check_token_binding(jwt_header, jwt_payload):
     row = cur.fetchone()
     cur.close()
     conn.close()
+
+    print("IP emitida en Postgres:", row, file=sys.stderr)
 
     if not row:
         # Token no existe o ya fue eliminado → bloqueado
@@ -297,9 +304,11 @@ def login():
         return jsonify({"error": "Invalid username or password"}), 401
 
     # 2. Crear JWT y guardarlo en token‑db junto con la IP remota
+    print("Intnetando crear JWT para el usuario:", user["id"], file=sys.stderr)
     token     = create_access_token(identity=user["id"])
     exp       = datetime.utcnow() + app.config['JWT_ACCESS_TOKEN_EXPIRES']
     issued_ip = get_client_ip()
+    print("IP del cliente:", issued_ip, file=sys.stderr)
 
     conn = get_token_db_conn()
     cur  = conn.cursor()
@@ -398,6 +407,8 @@ def me():
     """
     Devuelve el ID del usuario extraído del JWT ('sub').
     """
+    print("consultando el ID del usuario autenticado", file=sys.stderr)
+    print("JWT contiene:", get_jwt_identity(), file=sys.stderr)
     return jsonify({"id": str(get_jwt_identity())})
 
 

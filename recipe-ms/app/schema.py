@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 import os
 import jwt
+from app.cache_client import cache_del
 
 class CommentOut(BaseModel):
     id: str
@@ -123,6 +124,9 @@ class Query:
             doc["id"] = str(doc.pop("_id"))
             doc.setdefault("description", "")
             doc.setdefault("user_id", "unknown")
+            # Aseguramos que steps es siempre un array
+            if not isinstance(doc.get("steps"), list):
+            doc["steps"] = []
             recipes.append(Recipe(**doc))
         return recipes
 
@@ -173,6 +177,9 @@ class Query:
             doc["id"] = str(doc.pop("_id"))
             doc.setdefault("description", "")
             doc.setdefault("user_id", user_id)
+            # Igual aquí: garantizamos que steps sea lista
+            if not isinstance(doc.get("steps"), list):
+                doc["steps"] = []
             recipes.append(Recipe(**doc))
         return recipes
 
@@ -187,12 +194,22 @@ class Mutation:
     async def add_recipe(self, info, recipe: RecipeInput) -> Recipe:
         user_id = get_current_user_id(info)
         coll = get_collection("recipes")
+
+        # inserción en Mongo
         doc = recipe.__dict__
         doc["user_id"] = user_id
         res = await coll.insert_one(doc)
+
+        # obtén el documento recién creado
         new = await coll.find_one({"_id": res.inserted_id})
         new["id"] = str(new.pop("_id"))
+
+        # —>> INVALIDAMOS EL CACHE GLOBAL Y EL POR USUARIO
+        await cache_del("recipes:feed")
+        await cache_del(f"recipes:user_feed:{user_id}")
+
         return Recipe(**new)
+
 
     @strawberry.mutation
     async def update_recipe(self, info, id: str, recipe: RecipeInput) -> Optional[Recipe]:

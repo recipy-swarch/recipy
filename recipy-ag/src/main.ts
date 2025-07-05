@@ -12,13 +12,14 @@ async function bootstrap() {
 
   // Proxy /user/* al servicio de usuarios (se quita el prefijo /user)
   app.use(
-    '/user',
-    createProxyMiddleware({
-      target: process.env.USERAUTH_MS_URL,
-      changeOrigin: true,
-      pathRewrite: { '^/user': '' },
-    }),
-  );
+  '/user',
+  createProxyMiddleware({
+    target: process.env.USERAUTH_MS_URL,
+    changeOrigin: true,
+    pathRewrite: {},  // preserva “/user” intacto
+  }),
+);
+
 
   // Proxy /rpc/* al PostgREST
   app.use(
@@ -86,10 +87,9 @@ async function bootstrap() {
     }
   };
 
-  // 2. Middleware para extraer archivos multipart
+  // 2. Middleware para extraer archivos multipart (versión corregida)
   const processMultipartImages = async (req: any, _res: any, next: any) => {
-    // soportar tanto upload.array(...) (req.files como array)
-    // como upload.fields([{ name: 'images' }]) (req.files.images como array)
+    // multer ya ha llenado req.body con los campos de texto
     const files: any[] = Array.isArray(req.files)
       ? (req.files as any[])
       : ((req.files as { images?: any[] })?.images || []);
@@ -102,7 +102,6 @@ async function bootstrap() {
           form.append('image', file.buffer, file.originalname);
           form.append('type', 'recipe');
           form.append('id', req.userId ?? '0');
-          
           const { data } = await axios.post(
             `${process.env.IMAGE_MS_URL}/Image/upload`,
             form,
@@ -111,10 +110,12 @@ async function bootstrap() {
           return data.link;
         })
       );
-      // Reemplazo en el body para GraphQL
       req.body.images = links;
-      req.rawBody = JSON.stringify(req.body);
     }
+
+    // **Clave**: incluso sin ficheros, siempre serializo todo el req.body
+    req.rawBody = JSON.stringify(req.body);
+
     next();
   };
 
@@ -130,8 +131,22 @@ async function bootstrap() {
     },
     addUserIdHeader,               // <-- idem
     upload.fields([{ name: 'images', maxCount: 10 }]),  // declaras el campo exacto
-    processMultipartImages,        // <-- sube a image-ms con multipart
-    jsonParser,                    // <-- preservamos rawBody en JSON para el resto
+    processMultipartImages,
+
+    // middleware adicional: si no había rawBody pero sí un body, lo serializa
+    (req, _res, next) => {
+      if (!req.rawBody && req.body && Object.keys(req.body).length) {
+        // serializamos TODO lo que haya en req.body
+        req.rawBody = JSON.stringify(req.body);
+        // forzamos headers para que el proxy lo retransmita como JSON
+        req.headers['content-type']   = 'application/json';
+        req.headers['content-length'] = Buffer.byteLength(req.rawBody).toString();
+      }
+      next();
+    },
+
+    jsonParser,
+
     // Log the modified request body and headers after all modifications
     (req: any, _res: any, next: any) => {
       console.log('--- [RECIPE] Modified request ---');

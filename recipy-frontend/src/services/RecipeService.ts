@@ -1,8 +1,16 @@
 import { IRecipe } from "@/interfaces/IRecipe";
 import { IComments } from "@/interfaces/IComments";
-import { ILike  } from "@/interfaces/ILike";
+import { ILike } from "@/interfaces/ILike";
+
+/**
+ * Servicio único para todas las operaciones GraphQL de recetas.
+ * Se utiliza siempre `${this.apiUrl}/recipe/graphql` como endpoint.
+ */
 class RecipeService {
+  // URL base del WAF (gateway)
   private apiUrl: string;
+  // Endpoint GraphQL completo
+  private graphqlEndpoint: string;
 
   constructor() {
     this.apiUrl = process.env.WAF_URL || "";
@@ -10,243 +18,416 @@ class RecipeService {
     if (!this.apiUrl) {
       throw new Error("WAF_URL no está definido");
     }
+
+    // Si estamos en el navegador usamos ruta relativa (proxy de Next.js),
+    // si estamos en Node (SSR/actions) usamos la URL completa:
+    const inBrowser = typeof window !== "undefined";
+    this.graphqlEndpoint =
+      (inBrowser ? "" : this.apiUrl) + "/recipe/graphql";
   }
+  // 1) Obtener todas las recetas
   fetchAllRecipes = async (): Promise<IRecipe[]> => {
-    const url = `${this.apiUrl}/recipe/graphql/get_recipes`;
-    console.log("Fetching all recipes from:", url);
-
-    const response = await fetch(url, {
-      method: "GET",
-      // No necesitas headers de auth si devuelves todo
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("Error fetching recipes:", text);
-      throw new Error(`Error ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.error) {
-      console.error("Error creating recipe:", data.error);
-      throw new Error(`Error ${data.error}`);
-    }
-
-    return data as IRecipe[];
-  };
-
-  fetchRecipe = async (recipe_id: string): Promise<IRecipe> => {
-    const url = `${this.apiUrl}/recipe/graphql/recipes/${recipe_id}`;
-      console.log("Fetching one recipe from:", url);
-      const response = await fetch(url, { method: "GET" });
-        if (!response.ok) {
-          const err = await response.text();
-          console.error("Error fetching recipe:", err);
-          throw new Error(`Error ${response.status}`);
-        }
-      const data = (await response.json()) as IRecipe;
-    return data;
-  };
-
-  fetchComments = async (recipe_id: string): Promise<IComments[]> => {
-    const url = `${this.apiUrl}/recipe/graphql/recipes/${recipe_id}/comments`;
-    console.log("Fetching comments from:", url);
-    const response = await fetch(url, {
-      method: "GET",
+    const res = await fetch(this.graphqlEndpoint, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `
+          query {
+            recipes {
+              id
+              title
+              description
+              prepTime
+              portions
+              steps
+              images
+              video
+              userId
+            }
+          }
+        `,
+      }),
     });
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("Error fetching comments:", text);
-      throw new Error(`Error ${response.status}`);
+
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("Error fetching recipes:", txt);
+      throw new Error(txt);
     }
-    const data = await response.json();
-    // Esperamos un array con shape IComments[]
-    return data as IComments[];
-  }
-  createComment = async(
+
+    const { data, errors } = await res.json();
+    if (errors?.length) {
+      console.error("GraphQL errors:", errors);
+      throw new Error(errors.map((e: any) => e.message).join(", "));
+    }
+
+    return data.recipes as IRecipe[];
+  };
+
+  // 2) Obtener receta por ID
+  fetchRecipe = async (recipeId: string): Promise<IRecipe> => {
+    const res = await fetch(this.graphqlEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `
+          query ($id: ID!) {
+            recipe(id: $id) {
+              id
+              title
+              description
+              prepTime
+              portions
+              steps
+              images
+              video
+              userId
+            }
+          }
+        `,
+        variables: { id: recipeId },
+      }),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("Error fetching recipe:", txt);
+      throw new Error(txt);
+    }
+
+    const { data, errors } = await res.json();
+    if (errors?.length) {
+      console.error("GraphQL errors:", errors);
+      throw new Error(errors.map((e: any) => e.message).join(", "));
+    }
+
+    return data.recipe as IRecipe;
+  };
+
+  // 3) Obtener comentarios de una receta
+  fetchComments = async (recipeId: string): Promise<IComments[]> => {
+    const res = await fetch(this.graphqlEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `
+          query ($rid: ID!) {
+            commentsByRecipe(recipeId: $rid) {
+              id
+              recipeId
+              userId
+              content
+              parentId
+              createdAt
+            }
+          }
+        `,
+        variables: { rid: recipeId },
+      }),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("Error fetching comments:", txt);
+      throw new Error(txt);
+    }
+
+    const { data, errors } = await res.json();
+    if (errors?.length) {
+      console.error("GraphQL errors:", errors);
+      throw new Error(errors.map((e: any) => e.message).join(", "));
+    }
+
+    return data.commentsByRecipe as IComments[];
+  };
+
+  // 4) Crear un nuevo comentario
+  createComment = async (
     recipeId: string,
     content: string,
     parentId?: string,
     token?: string
   ): Promise<IComments> => {
-    const url = `${this.apiUrl}/recipe/graphql/comments_recipes`;
-    const payload: any = { recipe_id: recipeId, content };
-    if (parentId) payload.parent_id = parentId;
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    console.log("CommentService.createComment -> URL:", url, "headers:", headers, "payload:", payload);
-
-    const resp = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    });
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error("Error createComment:", text);
-      throw new Error(`Error ${resp.status}: ${text}`);
-    }
-    const data = await resp.json();
-    return data as IComments;
-  }
-
-  fetchUserRecipes = async (userId: string): Promise<IRecipe[]> => {
-    const response = await fetch(
-      `${this.apiUrl}/graphql/get_recipebyuserNA/${userId}`, // <-- Usando el endpoint correcto sin auth
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
+    const mutation = `
+      mutation ($input: CommentInput!) {
+        addComment(input: $input) {
+          id
+          recipeId
+          userId
+          content
+          parentId
+          createdAt
+        }
       }
-    );
+    `;
 
-    if (!response.ok) throw new Error(`Error ${response.status}`);
+    const input: any = { recipeId, content };
+    if (parentId) input.parentId = parentId;
 
-    const data = await response.json();
-
-    if (data.error) {
-      console.error("Error fetching user recipes:", data.error);
-      throw new Error(`Error ${data.error}`);
-    }
-
-    return data as IRecipe[];
-  };
-
-  fetchUserRecipesNA = async (userId: string): Promise<IRecipe[]> => {
-    const url = `${
-      this.apiUrl
-    }/recipe/graphql/get_recipebyuserNA?user_id=${encodeURIComponent(userId)}`;
-    console.log("→ Calling GET", url);
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
+    const res = await fetch(this.graphqlEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify({ query: mutation, variables: { input } }),
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("Error response:", text);
-      throw new Error(`Error fetching recipes: ${response.status}`);
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("Error creating comment:", txt);
+      throw new Error(txt);
     }
 
-    return (await response.json()) as IRecipe[];
+    const { data, errors } = await res.json();
+    if (errors?.length) {
+      console.error("GraphQL errors:", errors);
+      throw new Error(errors.map((e: any) => e.message).join(", "));
+    }
+
+    return data.addComment as IComments;
   };
 
+  // 5) Obtener recetas de un usuario
+  fetchUserRecipes = async (userId: string): Promise<IRecipe[]> => {
+    const res = await fetch(this.graphqlEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `
+          query ($uid: ID!) {
+            recipesByUser(userId: $uid) {
+              id
+              title
+              description
+              prepTime
+              portions
+              steps
+              images
+              video
+              userId
+            }
+          }
+        `,
+        variables: { uid: userId },
+      }),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("Error fetching user recipes:", txt);
+      throw new Error(txt);
+    }
+
+    const { data, errors } = await res.json();
+    if (errors?.length) {
+      console.error("GraphQL errors:", errors);
+      throw new Error(errors.map((e: any) => e.message).join(", "));
+    }
+
+    return data.recipesByUser as IRecipe[];
+  };
+
+  // 6) Crear receta
   createRecipe = async (
     formData: FormData,
     token: string
   ): Promise<IRecipe> => {
-    const res = await fetch(`${this.apiUrl}/recipe/graphql/create_recipe`, {
+    const input = {
+      title: formData.get("title"),
+      prepTime: formData.get("prep_time"),
+      portions: Number(formData.get("portions")),
+      description: formData.get("description"),
+      steps: JSON.parse(formData.get("steps") as string),
+      images: [],
+      video: null,
+    };
+
+    const mutation = `
+      mutation ($recipe: RecipeInput!) {
+        addRecipe(recipe: $recipe) {
+          id
+          title
+          description
+          prepTime
+          portions
+          steps
+          images
+          video
+          userId
+        }
+      }
+    `;
+
+    const res = await fetch(this.graphqlEndpoint, {
       method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: formData, // el navegador añade multipart/form-data con boundary
+      body: JSON.stringify({ query: mutation, variables: { recipe: input } }),
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      console.error("Error creating recipe:", text);
-      throw new Error(`Error ${res.status}`);
+      const txt = await res.text();
+      console.error("Error creating recipe:", txt);
+      throw new Error(txt);
     }
 
-    const data_r = await res.json();
-    if (data_r.error) {
-      console.error("Error creating recipe:", data_r.error);
-      throw new Error(`Error ${data_r.error}`);
+    const { data, errors } = await res.json();
+    if (errors?.length) {
+      console.error("GraphQL errors:", errors);
+      throw new Error(errors.map((e: any) => e.message).join(", "));
     }
 
-    return data_r as IRecipe;
+    return data.addRecipe as IRecipe;
   };
-    // 1) POST: dar like
-  likeRecipe = async(recipeId: string, token?: string): Promise<ILike> => {
-    const url = `${this.apiUrl}/recipe/graphql/like_recipe?recipe_id=${recipeId}`;
-    const headers: Record<string,string> = { "Content-Type": "application/json" };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    const resp = await fetch(url, {
+
+  // 7) Dar like a una receta
+  likeRecipe = async (
+    recipeId: string,
+    token?: string
+  ): Promise<ILike> => {
+    const mutation = `
+      mutation ($rid: ID!) {
+        likeRecipe(recipeId: $rid) {
+          userId
+          recipeId
+          createdAt
+        }
+      }
+    `;
+
+    const res = await fetch(this.graphqlEndpoint, {
       method: "POST",
-      headers,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify({ query: mutation, variables: { rid: recipeId } }),
     });
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error("Error likeRecipe:", text);
-      throw new Error(`Error ${resp.status}: ${text}`);
-    }
-    const data = await resp.json();
-    // data debe cumplir shape de ILike
-    return data as ILike;
-  }
 
-  // 2) DELETE: quitar like
-  unlikeRecipe = async (recipeId: string, token?: string): Promise<void> => {
-    const url = `${this.apiUrl}/recipe/graphql/unlike_recipe?recipe_id=${recipeId}`;
-    const headers: Record<string,string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    const resp = await fetch(url, {
-      method: "DELETE",
-      headers,
-    });
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error("Error unlikeRecipe:", text);
-      throw new Error(`Error ${resp.status}: ${text}`);
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("Error liking recipe:", txt);
+      throw new Error(txt);
     }
-    // 204 No Content: no devolvemos body
-  }
 
-  // 3) GET: número de likes
-  getLikesCount = async (recipeId: string): Promise<number> =>{
-    const url = `${this.apiUrl}/recipe/graphql/likes_count?recipe_id=${recipeId}`;
-    const resp = await fetch(url, {
-      method: "GET",
-    });
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error("Error getLikesCount:", text);
-      throw new Error(`Error ${resp.status}: ${text}`);
+    const { data, errors } = await res.json();
+    if (errors?.length) {
+      console.error("GraphQL errors:", errors);
+      throw new Error(errors.map((e: any) => e.message).join(", "));
     }
-    // El response_model es int, así que JSON.parse resp.json() devolaría un número
-    const data = await resp.json();
-    // data es un número: 
-    return data as number;
-  }
 
-  // 4) GET: saber si ya dio like (opcional, si implementaste el endpoint)
-    hasLiked = async(recipeId: string, token?: string): Promise<boolean> =>{
-    const url = `${this.apiUrl}/recipe/graphql/has_liked?recipe_id=${recipeId}`;
-    const headers: Record<string,string> = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-    const resp = await fetch(url, {
-      method: "GET",
-      headers,
+    return data.likeRecipe as ILike;
+  };
+
+  // 8) Quitar like de una receta
+  unlikeRecipe = async (
+    recipeId: string,
+    token?: string
+  ): Promise<boolean> => {
+    const mutation = `
+      mutation ($rid: ID!) {
+        unlikeRecipe(recipeId: $rid)
+      }
+    `;
+
+    const res = await fetch(this.graphqlEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify({ query: mutation, variables: { rid: recipeId } }),
     });
-    if (resp.status === 404) {
-      // Receta no existe o endpoint devuelve Not Found: tratamos como "no liked"
-      console.warn(`hasLiked: receta ${recipeId} no encontrada (404). Devolviendo false.`);
+
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("Error unliking recipe:", txt);
+      throw new Error(txt);
+    }
+
+    const { data, errors } = await res.json();
+    if (errors?.length) {
+      console.error("GraphQL errors:", errors);
+      throw new Error(errors.map((e: any) => e.message).join(", "));
+    }
+
+    return data.unlikeRecipe as boolean;
+  };
+
+  // 9) Contar likes de una receta
+  getLikesCount = async (recipeId: string): Promise<number> => {
+    const res = await fetch(this.graphqlEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `
+          query ($rid: ID!) {
+            likesCount(recipeId: $rid)
+          }
+        `,
+        variables: { rid: recipeId },
+      }),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("Error fetching likes count:", txt);
+      throw new Error(txt);
+    }
+
+    const { data, errors } = await res.json();
+    if (errors?.length) {
+      console.error("GraphQL errors:", errors);
+      throw new Error(errors.map((e: any) => e.message).join(", "));
+    }
+
+    return data.likesCount as number;
+  };
+
+  // 10) Saber si el usuario ya dio like
+  hasLiked = async (
+    recipeId: string,
+    token?: string
+  ): Promise<boolean> => {
+    const res = await fetch(this.graphqlEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify({
+        query: `
+          query ($rid: ID!) {
+            hasLiked(recipeId: $rid)
+          }
+        `,
+        variables: { rid: recipeId },
+      }),
+    });
+
+    // Si el backend responde 404, asumimos que no ha dado like
+    if (res.status === 404) {
       return false;
     }
-    if (!resp.ok) {
-      // Otros errores (401, 500, etc): los dejamos lanzar para manejar en la acción
-      const text = await resp.text();
-      console.error("Error hasLiked:", text);
-      throw new Error(`Error ${resp.status}: ${text}`);
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("Error fetching hasLiked:", txt);
+      throw new Error(txt);
     }
-    // 200 OK: parseamos boolean
-    const data = await resp.json();
-    return data as boolean;
-  }
+
+    const { data, errors } = await res.json();
+    if (errors?.length) {
+      console.error("GraphQL errors:", errors);
+      throw new Error(errors.map((e: any) => e.message).join(", "));
+    }
+
+    return data.hasLiked as boolean;
+  };
 }
 
+// Exportamos una instancia singleton del servicio
 const recipeService = new RecipeService();
 export default recipeService;

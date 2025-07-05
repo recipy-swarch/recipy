@@ -303,7 +303,7 @@ def login():
         return jsonify({"error": "Invalid username or password"}), 401
 
     # 2. Crear JWT y guardarlo en token‑db junto con la IP remota
-    token     = create_access_token(identity=user["id"])
+    token = create_access_token(identity=str(user["id"]))
     exp       = datetime.utcnow() + app.config['JWT_ACCESS_TOKEN_EXPIRES']
     issued_ip = get_client_ip()
 

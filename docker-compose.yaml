@@ -237,6 +237,8 @@ services:
   recipy-waf:
     image: owasp/modsecurity-crs:nginx-alpine
     container_name: recipy-waf
+    ports:
+      - "8080:8080" # ← AGREGA ESTA LÍNEA por chatgpt
     #volumes:
     #  - ./recipy-waf/rules:/etc/modsecurity.d/owasp-crs/rules:ro # Este volumen por alguna razón no funciona, iguamente usaremos las reglas por defecto de OWASP CRS
     depends_on:

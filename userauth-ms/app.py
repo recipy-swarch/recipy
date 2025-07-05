@@ -95,14 +95,20 @@ def get_client_ip():
 
 @jwt.token_in_blocklist_loader
 def check_token_binding(jwt_header, jwt_payload):
-    """
-    Se dispara en cada petición @jwt_required():
-      - Recupera el jti del payload
-      - Recupera el token completo del header
-      - Consulta la IP del cliente
-      - Comprueba en Redis (cache) o en Postgres la IP ligada al token
-      - Si hay mismatch, elimina el binding en Redis y revoca el token en BD
-    """
+    # Desactivamos el bloqueo por IP para que funcione desde el Gateway.
+    return False
+
+"""
+@jwt.token_in_blocklist_loader
+def check_token_binding(jwt_header, jwt_payload):
+    
+    #Se dispara en cada petición @jwt_required():
+    #  - Recupera el jti del payload
+    #  - Recupera el token completo del header
+    #  - Consulta la IP del cliente
+    #  - Comprueba en Redis (cache) o en Postgres la IP ligada al token
+    #  - Si hay mismatch, elimina el binding en Redis y revoca el token en BD
+    
     # Extraemos identificador único del token y token completo
     jti         = jwt_payload["jti"]
     token       = request.headers.get("Authorization", "").split()[-1]
@@ -163,7 +169,7 @@ def check_token_binding(jwt_header, jwt_payload):
     # revocamos el token en la base de datos
     _revoke_token_in_db(token)
     return True  # Token bloqueado
-
+    """
 
 def _revoke_token_in_db(token: str):
     """

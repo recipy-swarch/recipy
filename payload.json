@@ -1,0 +1,3 @@
+{
+  "query":"mutation { addRecipe(recipe:{title:\"Tortilla Española\",description:\"Tortilla de patatas casera\",prepTime:\"30\",portions:4,steps:[\"Pelar y laminar las patatas\",\"Freír las patatas\",\"Batir los huevos\",\"Cuajar la tortilla\"]}){id title description}}"
+}

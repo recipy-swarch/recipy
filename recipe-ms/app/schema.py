@@ -6,6 +6,8 @@ from app.db import get_collection
 from fastapi import HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional
+import os
+import jwt
 
 class CommentOut(BaseModel):
     id: str
@@ -23,12 +25,25 @@ class CommentWithRepliesOut(CommentOut):
 # ————————————————
 
 def get_current_user_id(info) -> str:
+    """
+    Extrae el Bearer token de Authorization, lo valida y devuelve el sub.
+    """
     req = info.context["request"]
-    user_id = req.headers.get("id")
-    if user_id:
-        return str(user_id)
-    raise HTTPException(status_code=401, detail="Authentication required")
-
+    auth: str | None = req.headers.get("authorization")
+    if not auth or not auth.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    token = auth.split(" ", 1)[1]
+    try:
+        payload = jwt.decode(
+            token,
+            os.getenv("JWT_SECRET", ""),
+            algorithms=[os.getenv("JWT_ALGO", "HS256")]
+        )
+        return str(payload.get("sub"))
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
 # -------------------------
 # Tipos de dominio
 # -------------------------
@@ -54,7 +69,6 @@ class RecipeInput:
     video: Optional[List[str]] = None
     portions: int
     steps: List[str]
-    user_id: str
 
 @strawberry.type
 class Comment:

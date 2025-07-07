@@ -403,3 +403,6 @@ FodyWeavers.xsd
 # Nuevos
 .env
 .venv/*
+
+#venv para pruebas de testeo prot3
+prot3_tests/venv/

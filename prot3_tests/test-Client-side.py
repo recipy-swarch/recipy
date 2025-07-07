@@ -51,7 +51,7 @@ try:
 
     # 📷 Subir imagen
     image_input = driver.find_element(By.CSS_SELECTOR, "input[type='file']")
-    image_path = "/home/crockedspecs/Desktop/recipy/recipy/prot3_tests/imagen-de-prueba.jpg"  # Ajusta ruta
+    image_path = "./imagen-de-prueba.jpg"  # Ajusta ruta
     image_input.send_keys(image_path)
     print(f"🖼 Imagen cargada: {image_path}")
 

@@ -164,7 +164,6 @@ services:
       - recipe-ms
     networks:
       - backend
-      - frontend
 
   # Image MS (ASP.NET Core Web API)
   image-ms:
@@ -245,6 +244,7 @@ services:
       BACKEND: "http://recipy-ag:3030" #Esta es la forma en que se pone la variable de entorno en el contenedor, no se puede usar el .env lastimosamente
     networks:
       - frontend
+      - backend
 
   # Servicio de desarrollo para captura y testing de correos
   mailhog:

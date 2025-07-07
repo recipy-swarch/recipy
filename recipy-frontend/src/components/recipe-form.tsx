@@ -21,9 +21,11 @@ export default function RecipeForm() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     if (!title.trim()) newErrors.title = "El título es obligatorio";
-    if (!prep_time.trim()) newErrors.prepTime = "El tiempo de preparación es obligatorio";
+    if (!prep_time.trim())
+      newErrors.prepTime = "El tiempo de preparación es obligatorio";
     if (portions < 1) newErrors.portions = "Las porciones deben ser al menos 1";
-    if (!description.trim()) newErrors.description = "La descripción es obligatoria";
+    if (!description.trim())
+      newErrors.description = "La descripción es obligatoria";
     if (ingredients.length === 0 || ingredients.every((i) => !i.trim())) {
       newErrors.ingredients = "Debes agregar al menos un ingrediente";
     }
@@ -77,7 +79,21 @@ export default function RecipeForm() {
     setIsSubmitting(true);
 
     try {
-      const processedImages = await Promise.all(images.map((f) => processAndConvert(f)));
+      const processedImages = await Promise.all(
+        images.map((f) => processAndConvert(f))
+      );
+
+      // ✅ Aquí estaba el error de paréntesis y llaves
+      console.log(
+        "🧪 Archivos procesados:\n",
+        processedImages
+          .map(
+            (img) =>
+              `📄 Nombre: ${img.name}\n📦 Tipo: ${img.type}\n📐 Tamaño: ${img.size} bytes\n---`
+          )
+          .join("\n")
+      );
+
       const formData = new FormData();
       formData.append("title", title);
       formData.append("prep_time", prep_time);
@@ -85,8 +101,10 @@ export default function RecipeForm() {
       formData.append("description", description);
       formData.append("steps", JSON.stringify(steps.filter((s) => s.trim())));
       processedImages.forEach((img) => formData.append("images", img));
+
       const token = localStorage.getItem("token");
       if (token) await createRecipe(formData, token);
+
       alert("¡Receta creada con éxito!");
     } catch (error) {
       console.error("Error al crear la receta:", error);

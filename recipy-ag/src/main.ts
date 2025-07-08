@@ -67,20 +67,24 @@ async function bootstrap() {
   const addUserIdHeader = async (req: any, _res: any, next: any) => {
     try {
       const authHeader = req.headers['authorization'] || '';
+      const xff = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '';
       console.log('Authorization header:', authHeader);
       if (authHeader) {
-        // sólo llamamos a /me si hay token
+        // Propaga el X-Forwarded-For original
         const { data } = await axios.get(
           `${process.env.USERAUTH_MS_URL}/me`,
-          { headers: { Authorization: authHeader } }
+          {
+            headers: {
+              Authorization: authHeader,
+              'X-Forwarded-For': xff,
+            }
+          }
         );
         console.log('Response from /me:', data);
         req.userId = data.id;
       }
-      // si no hay authHeader dejamos userId indefinido y continuamos
       return next();
     } catch (err) {
-      // loguear y continuar sin userId si falla la llamada
       console.warn('Error fetching user id:', err);
       return next();
     }
@@ -125,7 +129,7 @@ async function bootstrap() {
     (req: any, _res: any, next: any) => {
       console.log('--- [RECIPE] Incoming request ---');
       console.log('Headers:', req.headers);
-      //console.log('Body:', req.body);
+      console.log('Body:', req.body);
       next();
     },
     addUserIdHeader,               // <-- idem
@@ -136,8 +140,8 @@ async function bootstrap() {
     (req: any, _res: any, next: any) => {
       console.log('--- [RECIPE] Modified request ---');
       console.log('Headers:', req.headers);
-      //console.log('Body:', req.body);
-      //console.log('RawBody:', req.rawBody);
+      console.log('Body:', req.body);
+      console.log('RawBody:', req.rawBody);
       next();
     },
     createProxyMiddleware({

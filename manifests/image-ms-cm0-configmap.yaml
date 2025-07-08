@@ -1,0 +1,8 @@
+apiVersion: v1
+data:
+  .gitkeep: ""
+kind: ConfigMap
+metadata:
+  labels:
+    io.kompose.service: image-ms
+  name: image-ms-cm0

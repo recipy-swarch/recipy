@@ -91,7 +91,7 @@ services:
     networks:
       - backend
 
-# PostgreSQL for userauth-tokens
+  # PostgreSQL for userauth-tokens
   token-db:
     build:
       context: ./token-db
@@ -102,14 +102,15 @@ services:
       - .env
     environment:
       # Estas tres variables son las que usa postgres:17.5-alpine para crear la BD
-      POSTGRES_USER:   ${TOKEN_DB_USER}
+      POSTGRES_USER: ${TOKEN_DB_USER}
       POSTGRES_PASSWORD: ${TOKEN_DB_PASSWORD}
-      POSTGRES_DB:     ${TOKEN_DB_NAME}
+      POSTGRES_DB: ${TOKEN_DB_NAME}
     volumes:
       - ./token-db/data:/var/lib/postgresql/data
       - ./token-db/initdb:/docker-entrypoint-initdb.d:ro
     ports:
-      - "5433:5432"
+      # - "5433:5432" en el local de sergio no funciona este puerto porque esta ocupado, cambio probicional a - "5434:5432"
+      - "5434:5432"
     networks:
       - backend
 
@@ -119,12 +120,12 @@ services:
     container_name: userauth-postgrest
     restart: always
     env_file:
-       - .env
+      - .env
     volumes:
       - ./userauth-postgrest/postgrest.conf:/etc/postgrest.conf:ro
       #- ./recipe-db/data:/data/db  # Persistencia de datos
       #- ./recipe-db/initdb:/docker-entrypoint-initdb.d:ro # Comando de inicialización
-    
+
     ports:
       - "3001:3000"
     depends_on:
@@ -137,9 +138,13 @@ services:
     build:
       context: ./userauth-ms
     env_file:
-      - .env     # Apunta al .env de la raíz
+      - .env # Apunta al .env de la raíz
+    environment:
+      POSTGRES_HOST: userauth-db
+      POSTGRES_PORT: "5432"
+      PGRST_URL_LOCAL: http://userauth-postgrest:3000
     ports:
-      - "5000:5000"   
+      - "5000:5000"
     depends_on:
       - userauth-postgrest
       - token-db
@@ -159,47 +164,96 @@ services:
       - recipe-ms
     networks:
       - backend
-      - frontend
-  
+
   # Image MS (ASP.NET Core Web API)
   image-ms:
     build:
       context: ./image-ms
+    deploy:
+      replicas: 3
     env_file:
       - .env
-    ports:
-      - "8080:8080"
+    #ports:
+    #  - "8080:8080"
     volumes:
-      - ./image-ms/uploads:/app/wwwroot/uploads
+      - ./image-ms/image-uploads:/app/wwwroot/uploads
     networks:
       - backend
 
-  recipy-rp:
+  recipy-rp-app:
     image: nginx:alpine
-    container_name: recipy-rp
+    container_name: recipy-rp-app
     volumes:
-      - ./recipy-rp/default.conf.template:/etc/nginx/conf.d/default.conf.template
-      - ./recipy-rp/entrypoint.sh:/entrypoint.sh
+      - ./recipy-rp-app/default.conf.template:/etc/nginx/conf.d/default.conf.template
+      - ./recipy-rp-app/entrypoint.sh:/entrypoint.sh
+      - ./recipy-rp-app/nginx.conf:/etc/nginx/nginx.conf
+      - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt
+      - ./certs/recipy.key:/etc/ssl/private/recipy.key
     ports:
-      - "80:80"
+      - "81:80" # Aquí tocó poner 81 y 444 ya que tenemos otro nginx, y perdon por priorizar el front antes que el back Jhon, se que te duele
+      - "444:443"
     env_file:
       - .env
     entrypoint: ["/entrypoint.sh"]
-    #depends_on:
-    #  - recipy-ag
+    depends_on:
+      - recipy-waf
     networks:
       - frontend
 
+  recipy-rp-frontend:
+    image: nginx:alpine
+    container_name: recipy-rp-frontend
+    volumes:
+      - ./recipy-rp-frontend/default.conf.template:/etc/nginx/conf.d/default.conf.template
+      - ./recipy-rp-frontend/entrypoint.sh:/entrypoint.sh
+      - ./recipy-rp-frontend/nginx.conf:/etc/nginx/nginx.conf
+      - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt
+      - ./certs/recipy.key:/etc/ssl/private/recipy.key
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file:
+      - .env
+    entrypoint: ["/entrypoint.sh"]
+    depends_on:
+      - recipy-frontend
+    networks:
+      - frontend
+
+  image-rp-lb:
+    image: nginx:alpine
+    container_name: image-rp-lb
+    volumes:
+      - ./image-rp-lb/default.conf:/etc/nginx/conf.d/default.conf
+    expose:
+      - "80"
+    ports:
+      - "83:80"
+    depends_on:
+      - image-ms
+    networks:
+      - backend
+  recipy-waf:
+    image: owasp/modsecurity-crs:nginx-alpine
+    container_name: recipy-waf
+    #volumes:
+    #  - ./recipy-waf/rules:/etc/modsecurity.d/owasp-crs/rules:ro # Este volumen por alguna razón no funciona, iguamente usaremos las reglas por defecto de OWASP CRS
+    depends_on:
+      - recipy-ag
+    environment:
+      BACKEND: "http://recipy-ag:3030" #Esta es la forma en que se pone la variable de entorno en el contenedor, no se puede usar el .env lastimosamente
+    networks:
+      - frontend
+      - backend
 
   # Servicio de desarrollo para captura y testing de correos
   mailhog:
     image: mailhog/mailhog
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # UI web
+      - "1025:1025" # SMTP
+      - "8025:8025" # UI web
     networks:
       - backend
-
 
   # Servicio de correo asíncrono
   mail-ms:
@@ -209,7 +263,7 @@ services:
     ports:
       - "8085:8080"
     env_file:
-      - .env      # Carga MAIL_SMTP_* y AMQP_URL
+      - .env # Carga MAIL_SMTP_* y AMQP_URL
     depends_on:
       - mail-broker
     networks:
@@ -222,15 +276,14 @@ services:
     container_name: mail-broker
     restart: always
     ports:
-      - "5672:5672"    # AMQP
-      - "15672:15672"  # Management UI
+      - "5672:5672" # AMQP
+      - "15672:15672" # Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       backend:
         aliases:
-          - rabbitmq   # para tests de userauth-ms
-
+          - rabbitmq # para tests de userauth-ms
 
 volumes:
   rabbitmq_data:
@@ -240,4 +293,3 @@ networks:
   frontend:
   backend:
     driver: bridge
-

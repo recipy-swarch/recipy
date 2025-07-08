@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.version: 1.36.0 (HEAD)
+  labels:
+    io.kompose.service: recipe-cache
+  name: recipe-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: recipe-cache
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose --file docker-compose.yaml convert
+        kompose.version: 1.36.0 (HEAD)
+      labels:
+        io.kompose.service: recipe-cache
+    spec:
+      containers:
+        - envFrom:
+            - configMapRef:
+                name: env
+          image: recipe-cache
+          name: recipe-cache-api
+          ports:
+            - containerPort: 8001
+              protocol: TCP
+      restartPolicy: Always

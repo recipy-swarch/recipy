@@ -54,4 +54,4 @@ TestResult.xml
 nunit-*.xml
 
 # Ignore the uploads
-uploads/*/**
+image-uploads/*/**

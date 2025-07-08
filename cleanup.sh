@@ -32,9 +32,20 @@ function eliminar_bases_datos() {
 
 function corregir_permisos_image_ms() {
     echo "Corrigiendo permisos del volumen de la imagen recipe-ms..."
-    mkdir -p image-ms/uploads
-    sudo chown -R 1000:1000 image-ms/uploads
-    sudo chmod -R 777 image-ms/uploads
+    sudo rm -rf image-ms/uploads # Elimina el directorio uploads si existe, este es el nombre anterior
+    mkdir -p image-ms/image-uploads
+    sudo chown -R 1000:1000 image-ms/image-uploads
+    sudo chmod -R 777 image-ms/image-uploads
+}
+
+function correr_contenedores_build_detach() {
+    echo "Reconstruyendo e iniciando contenedores en background..."
+    sudo docker compose up --build -d
+}
+
+function bajar_todo() {
+    echo "Bajando servicios y eliminando redes y volúmenes huérfanos..."
+    sudo docker compose down --remove-orphans --volumes
 }
 
 while true; do
@@ -46,6 +57,8 @@ while true; do
     echo "4. Correr los contenedores"
     echo "5. Corregir permisos del volumen recipe-ms"
     echo "6. Eliminar bases de datos"
+    echo "7. Reconstruir y levantar contenedores en background"
+    echo "8. Baja todo (y elimina redes/volúmenes huérfanos)"
     echo "0. Salir"
     read -p "Opción: " opcion
 
@@ -68,9 +81,15 @@ while true; do
         6)
             eliminar_bases_datos
             ;;
+        7)
+            correr_contenedores_build_detach
+            ;;
         0)
             echo "Saliendo..."
             break
+            ;;
+        8)
+            bajar_todo
             ;;
         *)
             echo "Opción inválida. Intenta nuevamente."

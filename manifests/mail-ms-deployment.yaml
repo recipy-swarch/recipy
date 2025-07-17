@@ -24,7 +24,7 @@ spec:
         - envFrom:
             - configMapRef:
                 name: env
-          image: mail-ms
+          image: ludiazv/recipy-mail-ms:latest
           name: mail-ms
           ports:
             - containerPort: 8080

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
     kompose.version: 1.36.0 (HEAD)
   labels:
     io.kompose.service: mail-broker
@@ -17,7 +17,7 @@ spec:
   template:
     metadata:
       annotations:
-        kompose.cmd: kompose --file docker-compose.yaml convert
+        kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
         kompose.version: 1.36.0 (HEAD)
       labels:
         io.kompose.service: mail-broker

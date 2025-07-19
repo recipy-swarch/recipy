@@ -2,15 +2,15 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
     kompose.version: 1.36.0 (HEAD)
   labels:
     io.kompose.service: token-db
   name: token-db
 spec:
   ports:
-    - name: "5433"
-      port: 5433
+    - name: "5434"
+      port: 5434
       targetPort: 5432
   selector:
     io.kompose.service: token-db

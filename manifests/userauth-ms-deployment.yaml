@@ -24,7 +24,7 @@ spec:
         - envFrom:
             - configMapRef:
                 name: env
-          image: userauth-ms
+          image: fnovoas/recipy-userauth-ms:latest
           name: userauth-ms
           ports:
             - containerPort: 5000

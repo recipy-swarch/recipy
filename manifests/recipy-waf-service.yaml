@@ -5,12 +5,12 @@ metadata:
     kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
     kompose.version: 1.36.0 (HEAD)
   labels:
-    io.kompose.service: userauth-db
-  name: userauth-db
+    io.kompose.service: recipy-waf
+  name: recipy-waf
 spec:
   ports:
-    - name: "5432"
-      port: 5432
-      targetPort: 5432
+    - name: "8080"
+      port: 8080
+      targetPort: 8080
   selector:
-    io.kompose.service: userauth-db
+    io.kompose.service: recipy-waf

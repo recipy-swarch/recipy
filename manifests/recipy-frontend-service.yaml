@@ -1,23 +1,17 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: recipy-frontend
+  annotations:
+    kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
+    kompose.version: 1.36.0 (HEAD)
   labels:
     io.kompose.service: recipy-frontend
-  annotations:
-    kompose.cmd: kompose --file docker-compose.yaml convert
-    kompose.version: 1.36.0 (HEAD)
+  name: recipy-frontend
 spec:
   type: LoadBalancer  # <-- Esta línea es clave
-  selector:
-    io.kompose.service: recipy-frontend
   ports:
     - name: "3000"
-      port: 80            # Exponer en el 80 públicamente
-      targetPort: 3000    # Redirigir al contenedor
-    - name: "9229"
-      port: 9229
-      targetPort: 9229
-    - name: "9230"
-      port: 9230
-      targetPort: 9230
+      port: 3000
+      targetPort: 3000
+  selector:
+    io.kompose.service: recipy-frontend

@@ -3,10 +3,11 @@ data:
   AMQP_URL: amqp://guest:guest@mail-broker:5672/
   API_GATEWAY_URL: http://recipy-ag:3030
   ASPNETCORE_ENVIRONMENT: Development
-  CACHE_API_URL: http://localhost:8001
+  CACHE_API_URL: http://recipe-cache-api:8001
   DETAIL_CACHE_TTL: "300"
   FEED_CACHE_TTL: "60"
-  IMAGE_MS_URL: http://image-ms:8080
+  FRONTEND_URL: http://recipy-frontend:3000
+  IMAGE_MS_URL: http://image-rp-lb:80
   Image__API_GATEWAY_URL: http://recipy-ag:3030
   JWT_ALGO: HS256
   JWT_CACHE_TTL_SEC: "86400"
@@ -39,11 +40,13 @@ data:
   RECIPE_PWD: recipe_pass
   RECIPE_USER: recipe_user
   REDIS_URL: redis://recipy-cache:6379/0
+  TOKEN_DB_HOST: token-db
   TOKEN_DB_NAME: token_db
   TOKEN_DB_PASSWORD: password123
   TOKEN_DB_PORT: "5432"
   TOKEN_DB_USER: admin
   USERAUTH_MS_URL: http://userauth-ms:5000
+  WAF_URL: http://recipy-waf:8080
 kind: ConfigMap
 metadata:
   labels:

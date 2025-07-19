@@ -11,11 +11,28 @@ data:
       token      TEXT      NOT NULL,
       user_id INT NOT NULL,
       issued_at  TIMESTAMP NOT NULL DEFAULT NOW(),
-      expires_at TIMESTAMP NOT NULL
+      expires_at TIMESTAMP NOT NULL,
+      issued_ip  TEXT      NOT NULL -- patrón 1.2.2.
     );
 
     CREATE INDEX idx_jwt_tokens_user  ON jwt_tokens(user_id);
     CREATE INDEX idx_jwt_tokens_token ON jwt_tokens(token);
+  02-add-issued-ip.sql: |
+    ALTER TABLE recipy.jwt_tokens
+      ADD COLUMN issued_ip TEXT NOT NULL DEFAULT '';
+  03-populate-issued-ip.sql: |-
+    -- 3. Depuración de tokens anteriores sin issued_ip
+    --    (para entornos existentes: revocamos los JWT creados antes de habilitar Token Binding)
+    SET search_path = recipy;
+
+    DELETE FROM jwt_tokens
+    WHERE issued_ip = '';
+
+    '''
+    Esto revoca todos los JWT emitidos antes de habilitar Token Binding.
+    Tras aplicar la migración, los usuarios deberán volver a autenticarse
+    para obtener un token con su binding IP correctamente poblado.
+    '''
 kind: ConfigMap
 metadata:
   labels:

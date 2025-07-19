@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
+    kompose.version: 1.36.0 (HEAD)
+  labels:
+    io.kompose.service: recipy-rp-frontend
+  name: recipy-rp-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: recipy-rp-frontend
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
+        kompose.version: 1.36.0 (HEAD)
+      labels:
+        io.kompose.service: recipy-rp-frontend
+    spec:
+      containers:
+        - command:
+            - /entrypoint.sh
+          envFrom:
+            - configMapRef:
+                name: env
+          image: nginx:alpine
+          name: recipy-rp-frontend
+          ports:
+            - containerPort: 80
+              protocol: TCP
+            - containerPort: 443
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/nginx/conf.d/default.conf.template
+              name: recipy-rp-frontend-cm0
+              readOnly: true
+              subPath: default.conf.template
+            - mountPath: /entrypoint.sh
+              name: recipy-rp-frontend-cm1
+              readOnly: true
+              subPath: entrypoint.sh
+            - mountPath: /etc/nginx/nginx.conf
+              name: recipy-rp-frontend-cm2
+              readOnly: true
+              subPath: nginx.conf
+            - mountPath: /etc/ssl/certs/recipy.crt
+              name: recipy-rp-frontend-cm3
+              readOnly: true
+              subPath: recipy.crt
+            - mountPath: /etc/ssl/private/recipy.key
+              name: recipy-rp-frontend-cm4
+              readOnly: true
+              subPath: recipy.key
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            items:
+              - key: default.conf.template
+                path: default.conf.template
+            name: recipy-rp-frontend-cm0
+          name: recipy-rp-frontend-cm0
+        - configMap:
+            items:
+              - key: entrypoint.sh
+                path: entrypoint.sh
+            name: recipy-rp-frontend-cm1
+          name: recipy-rp-frontend-cm1
+        - configMap:
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+            name: recipy-rp-frontend-cm2
+          name: recipy-rp-frontend-cm2
+        - configMap:
+            items:
+              - key: recipy.crt
+                path: recipy.crt
+            name: recipy-rp-frontend-cm3
+          name: recipy-rp-frontend-cm3
+        - configMap:
+            items:
+              - key: recipy.key
+                path: recipy.key
+            name: recipy-rp-frontend-cm4
+          name: recipy-rp-frontend-cm4

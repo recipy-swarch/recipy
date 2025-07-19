@@ -6,14 +6,12 @@ services:
       dockerfile: Docker/development/Dockerfile
     ports:
       - "3000:3000"
-      - "9229:9229" # Debugger
-      - "9230:9230" # Debugger
-    volumes:
-      - ./recipy-frontend/src:/app/src
     env_file:
       - .env
     networks:
       - frontend
+    environment:
+      - PORT=3000
   # Recipe micro-service (FastAPI/Uvicorn)
   recipe-ms:
     build:
@@ -173,6 +171,8 @@ services:
       replicas: 3
     env_file:
       - .env
+    expose:
+      - "8080" # Expose the port for internal communication
     #ports:
     #  - "8080:8080"
     volumes:
@@ -184,11 +184,11 @@ services:
     image: nginx:alpine
     container_name: recipy-rp-app
     volumes:
-      - ./recipy-rp-app/default.conf.template:/etc/nginx/conf.d/default.conf.template
-      - ./recipy-rp-app/entrypoint.sh:/entrypoint.sh
-      - ./recipy-rp-app/nginx.conf:/etc/nginx/nginx.conf
-      - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt
-      - ./certs/recipy.key:/etc/ssl/private/recipy.key
+      - ./recipy-rp-app/default.conf.template:/etc/nginx/conf.d/default.conf.template:ro
+      - ./recipy-rp-app/entrypoint.sh:/entrypoint.sh:ro
+      - ./recipy-rp-app/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt:ro
+      - ./certs/recipy.key:/etc/ssl/private/recipy.key:ro
     ports:
       - "81:80" # Aquí tocó poner 81 y 444 ya que tenemos otro nginx, y perdon por priorizar el front antes que el back Jhon, se que te duele
       - "444:443"
@@ -204,11 +204,11 @@ services:
     image: nginx:alpine
     container_name: recipy-rp-frontend
     volumes:
-      - ./recipy-rp-frontend/default.conf.template:/etc/nginx/conf.d/default.conf.template
-      - ./recipy-rp-frontend/entrypoint.sh:/entrypoint.sh
-      - ./recipy-rp-frontend/nginx.conf:/etc/nginx/nginx.conf
-      - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt
-      - ./certs/recipy.key:/etc/ssl/private/recipy.key
+      - ./recipy-rp-frontend/default.conf.template:/etc/nginx/conf.d/default.conf.template:ro
+      - ./recipy-rp-frontend/entrypoint.sh:/entrypoint.sh:ro
+      - ./recipy-rp-frontend/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt:ro
+      - ./certs/recipy.key:/etc/ssl/private/recipy.key:ro
     ports:
       - "80:80"
       - "443:443"
@@ -224,7 +224,7 @@ services:
     image: nginx:alpine
     container_name: image-rp-lb
     volumes:
-      - ./image-rp-lb/default.conf:/etc/nginx/conf.d/default.conf
+      - ./image-rp-lb/default.conf:/etc/nginx/conf.d/default.conf:ro
     expose:
       - "80"
     ports:
@@ -242,6 +242,8 @@ services:
       - recipy-ag
     environment:
       BACKEND: "http://recipy-ag:3030" #Esta es la forma en que se pone la variable de entorno en el contenedor, no se puede usar el .env lastimosamente
+    expose:
+      - "8080"
     networks:
       - frontend
       - backend

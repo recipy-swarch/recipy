@@ -5,30 +5,28 @@ metadata:
     kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
     kompose.version: 1.36.0 (HEAD)
   labels:
-    io.kompose.service: recipe-ms
-  name: recipe-ms
+    io.kompose.service: recipy-waf
+  name: recipy-waf
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: recipe-ms
-  strategy:
-    type: Recreate
+      io.kompose.service: recipy-waf
   template:
     metadata:
       annotations:
         kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
         kompose.version: 1.36.0 (HEAD)
       labels:
-        io.kompose.service: recipe-ms
+        io.kompose.service: recipy-waf
     spec:
       containers:
-        - envFrom:
-            - configMapRef:
-                name: env
-          image: fabiomurcia/recipy-recipe-ms:latest
-          name: recipe-ms
+        - env:
+            - name: BACKEND
+              value: http://recipy-ag:3030
+          image: owasp/modsecurity-crs:nginx-alpine
+          name: recipy-waf
           ports:
-            - containerPort: 8000
+            - containerPort: 8080
               protocol: TCP
       restartPolicy: Always

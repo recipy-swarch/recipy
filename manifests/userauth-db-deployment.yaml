@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
     kompose.version: 1.36.0 (HEAD)
   labels:
     io.kompose.service: userauth-db
@@ -17,7 +17,7 @@ spec:
   template:
     metadata:
       annotations:
-        kompose.cmd: kompose --file docker-compose.yaml convert
+        kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
         kompose.version: 1.36.0 (HEAD)
       labels:
         io.kompose.service: userauth-db
@@ -32,10 +32,15 @@ spec:
             - containerPort: 5432
               protocol: TCP
           volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: userauth-db-claim0
             - mountPath: /docker-entrypoint-initdb.d
               name: userauth-db-cm1
       restartPolicy: Always
       volumes:
+        - name: userauth-db-claim0
+          persistentVolumeClaim:
+            claimName: userauth-db-claim0
         - configMap:
             name: userauth-db-cm1
           name: userauth-db-cm1

@@ -6,14 +6,12 @@ services:
       dockerfile: Docker/development/Dockerfile
     ports:
       - "3000:3000"
-      - "9229:9229" # Debugger
-      - "9230:9230" # Debugger
-    volumes:
-      - ./recipy-frontend/src:/app/src
     env_file:
       - .env
     networks:
       - frontend
+    environment:
+      - PORT=3000
   # Recipe micro-service (FastAPI/Uvicorn)
   recipe-ms:
     build:

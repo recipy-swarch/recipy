@@ -23,14 +23,17 @@ spec:
         io.kompose.service: token-db
     spec:
       containers:
-        - envFrom:
-            - configMapRef:
-                name: env
+        - name: token-db
           image: juandvasquezp/token-db
-          name: token-db
           ports:
             - containerPort: 5432
               protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: env
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           volumeMounts:
             - mountPath: /var/lib/postgresql/data
               name: token-db-claim0
@@ -42,6 +45,6 @@ spec:
         - name: token-db-claim0
           persistentVolumeClaim:
             claimName: token-db-claim0
-        - configMap:
+        - name: token-db-cm1
+          configMap:
             name: token-db-cm1
-          name: token-db-cm1

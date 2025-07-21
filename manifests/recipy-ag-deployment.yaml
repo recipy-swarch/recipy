@@ -29,4 +29,7 @@ spec:
           ports:
             - containerPort: 3030
               protocol: TCP
+          env:
+            - name: RECIPE_API_URL
+              value: http://recipe-ms:8000
       restartPolicy: Always

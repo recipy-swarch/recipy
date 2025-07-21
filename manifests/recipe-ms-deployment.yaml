@@ -31,4 +31,7 @@ spec:
           ports:
             - containerPort: 8000
               protocol: TCP
+          env:
+            - name: CACHE_API_URL
+              value: http://recipe-cache:8001
       restartPolicy: Always

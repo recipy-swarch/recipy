@@ -3,11 +3,11 @@ data:
   AMQP_URL: amqp://guest:guest@mail-broker:5672/
   API_GATEWAY_URL: http://recipy-ag:3030
   ASPNETCORE_ENVIRONMENT: Development
-  CACHE_API_URL: http://recipe-cache-api:8001
+  CACHE_API_URL: http://recipe-cache:8001
   DETAIL_CACHE_TTL: "300"
   FEED_CACHE_TTL: "60"
   FRONTEND_URL: http://recipy-frontend:3000
-  IMAGE_MS_URL: http://image-rp-lb:80
+  IMAGE_MS_URL: http://image-ms:8080
   Image__API_GATEWAY_URL: http://recipy-ag:3030
   JWT_ALGO: HS256
   JWT_CACHE_TTL_SEC: "86400"
@@ -35,7 +35,7 @@ data:
   POSTGRES_USER: admin
   RABBITMQ_HOST: mail-broker
   RABBITMQ_PORT: "5672"
-  RECIPE_API_URL: http://localhost:8000
+  # RECIPE_API_URL: http://recipe-ms:8000
   RECIPE_MS_URL: http://recipe-ms:8000
   RECIPE_PWD: recipe_pass
   RECIPE_USER: recipe_user

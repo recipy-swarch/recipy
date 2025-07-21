@@ -33,7 +33,7 @@ spec:
               protocol: TCP
           volumeMounts:
             - mountPath: /app/wwwroot/uploads
-              name: image-ms-cm0
+              name: image-storage
           livenessProbe:
             httpGet:
               path: /health
@@ -47,7 +47,11 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 5
       restartPolicy: Always
+      #volumes:
+      #  - configMap:
+      #      name: image-ms-cm0
+      #    name: image-ms-cm0
       volumes:
-        - configMap:
-            name: image-ms-cm0
-          name: image-ms-cm0
+        - name: image-storage
+          persistentVolumeClaim:
+            claimName: image-ms-pvc

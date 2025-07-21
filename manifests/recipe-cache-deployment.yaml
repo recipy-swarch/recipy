@@ -25,7 +25,7 @@ spec:
             - configMapRef:
                 name: env
           image: crockedspecs/recipy-recipe-cache
-          name: recipe-cache-api
+          name: recipe-cache
           ports:
             - containerPort: 8001
               protocol: TCP

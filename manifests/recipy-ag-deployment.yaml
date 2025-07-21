@@ -24,7 +24,7 @@ spec:
         - envFrom:
             - configMapRef:
                 name: env
-          image: ludiazv/recipy-recipy-ag
+          image: juandvasquezp/recipy-ag
           name: recipy-ag
           ports:
             - containerPort: 3030

@@ -24,7 +24,7 @@ spec:
         - envFrom:
             - configMapRef:
                 name: env
-          image: crockedspecs/recipy-recipe-cache:latest
+          image: recipe-cache
           name: recipe-cache-api
           ports:
             - containerPort: 8001

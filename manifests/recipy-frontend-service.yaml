@@ -8,7 +8,6 @@ metadata:
     io.kompose.service: recipy-frontend
   name: recipy-frontend
 spec:
-  type: LoadBalancer  # <-- Esta línea es clave
   ports:
     - name: "3000"
       port: 3000

@@ -4,6 +4,8 @@ services:
     build:
       context: ./recipy-frontend
       dockerfile: Docker/development/Dockerfile
+    expose:
+      - "3000" # Expose the port for internal communication
     ports:
       - "3000:3000"
     env_file:
@@ -18,8 +20,8 @@ services:
       context: ./recipe-ms
       dockerfile: Dockerfile
     container_name: recipe-ms
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000" # Expose the port for internal communication
     volumes:
       - ./recipe-ms/app:/app/app
     env_file:
@@ -37,8 +39,8 @@ services:
     restart: always
     env_file:
       - .env
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379" # Expose the port for internal communication
     volumes:
       - redis-data:/data
     networks:
@@ -50,8 +52,8 @@ services:
       context: ./recipy-cache
       dockerfile: Dockerfile
     container_name: recipe-cache-api
-    ports:
-      - "8001:8001"
+    expose:
+      - "8001" # Expose the port for internal communication
     env_file:
       - .env
     depends_on:
@@ -69,8 +71,8 @@ services:
     volumes:
       - ./recipe-db/data:/data/db
       - ./recipe-db/initdb:/docker-entrypoint-initdb.d:ro
-    ports:
-      - "27018:27017"
+    expose:
+      - "27017" # Expose the port for internal communication
     networks:
       - backend
 
@@ -84,8 +86,8 @@ services:
     volumes:
       - ./userauth-db/data:/var/lib/postgresql/data
       - ./userauth-db/initdb:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432" # Expose the port for internal communication
     networks:
       - backend
 
@@ -106,9 +108,8 @@ services:
     volumes:
       - ./token-db/data:/var/lib/postgresql/data
       - ./token-db/initdb:/docker-entrypoint-initdb.d:ro
-    ports:
-      # - "5433:5432" en el local de sergio no funciona este puerto porque esta ocupado, cambio probicional a - "5434:5432"
-      - "5434:5432"
+    expose:
+      - "5432" # Expose the port for internal communication
     networks:
       - backend
 
@@ -123,9 +124,8 @@ services:
       - ./userauth-postgrest/postgrest.conf:/etc/postgrest.conf:ro
       #- ./recipe-db/data:/data/db  # Persistencia de datos
       #- ./recipe-db/initdb:/docker-entrypoint-initdb.d:ro # Comando de inicialización
-
-    ports:
-      - "3001:3000"
+    expose:
+      - "3000" # Expose the port for internal communication
     depends_on:
       - userauth-db
     networks:
@@ -141,8 +141,8 @@ services:
       POSTGRES_HOST: userauth-db
       POSTGRES_PORT: "5432"
       PGRST_URL_LOCAL: http://userauth-postgrest:3000
-    ports:
-      - "5000:5000"
+    expose:
+      - "5000" # Expose the port for internal communication
     depends_on:
       - userauth-postgrest
       - token-db
@@ -155,8 +155,8 @@ services:
       context: ./recipy-ag
     env_file:
       - .env
-    ports:
-      - "3030:3030"
+    expose:
+      - "3030" # Expose the port for internal communication
     depends_on:
       - userauth-ms
       - recipe-ms
@@ -173,8 +173,6 @@ services:
       - .env
     expose:
       - "8080" # Expose the port for internal communication
-    #ports:
-    #  - "8080:8080"
     volumes:
       - ./image-ms/image-uploads:/app/wwwroot/uploads
     networks:
@@ -189,9 +187,9 @@ services:
       - ./recipy-rp-app/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt:ro
       - ./certs/recipy.key:/etc/ssl/private/recipy.key:ro
-    ports:
-      - "81:80" # Aquí tocó poner 81 y 444 ya que tenemos otro nginx, y perdon por priorizar el front antes que el back Jhon, se que te duele
-      - "444:443"
+    expose:
+      - "80" # Aquí tocó poner 81 y 444 ya que tenemos otro nginx, y perdon por priorizar el front antes que el back Jhon, se que te duele
+      - "443"
     env_file:
       - .env
     entrypoint: ["/entrypoint.sh"]
@@ -209,9 +207,9 @@ services:
       - ./recipy-rp-frontend/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./certs/recipy.crt:/etc/ssl/certs/recipy.crt:ro
       - ./certs/recipy.key:/etc/ssl/private/recipy.key:ro
-    ports:
-      - "80:80"
-      - "443:443"
+    expose:
+      - "80" # Aquí tocó poner 81 y 444 ya que tenemos otro nginx, y perdon por priorizar el front antes que el back Jhon, se que te duele
+      - "443"
     env_file:
       - .env
     entrypoint: ["/entrypoint.sh"]
@@ -227,8 +225,6 @@ services:
       - ./image-rp-lb/default.conf:/etc/nginx/conf.d/default.conf:ro
     expose:
       - "80"
-    ports:
-      - "83:80"
     depends_on:
       - image-ms
     networks:
@@ -251,9 +247,9 @@ services:
   # Servicio de desarrollo para captura y testing de correos
   mailhog:
     image: mailhog/mailhog
-    ports:
-      - "1025:1025" # SMTP
-      - "8025:8025" # UI web
+    expose:
+      - "1025"
+      - "8025"
     networks:
       - backend
 
@@ -262,8 +258,8 @@ services:
     build:
       context: ./mail-ms
       dockerfile: Dockerfile
-    ports:
-      - "8085:8080"
+    expose:
+      - "8080"
     env_file:
       - .env # Carga MAIL_SMTP_* y AMQP_URL
     depends_on:
@@ -277,9 +273,9 @@ services:
     image: rabbitmq:3-management
     container_name: mail-broker
     restart: always
-    ports:
-      - "5672:5672" # AMQP
-      - "15672:15672" # Management UI
+    expose:
+      - "5672" # AMQP
+      - "15672" # Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:

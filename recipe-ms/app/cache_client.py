@@ -3,7 +3,7 @@ import os
 import httpx
 from typing import Any, Optional
 
-CACHE_API = os.getenv("CACHE_API_URL", "http://cache-api:8001")
+CACHE_API = os.getenv("CACHE_API_URL")
 _client = httpx.AsyncClient(timeout=3.0)
 
 async def cache_get(key: str) -> Optional[Any]:

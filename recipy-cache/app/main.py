@@ -10,9 +10,6 @@ from dotenv import load_dotenv
 app = FastAPI(title="recipe-cache")
 load_dotenv()  # carga REDIS_URL, DEFAULT_CACHE_TTL, API_URL, etc.
 
-# 1. Monta el directorio static (css/js/img) en /static
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
 # 2. Configura Jinja2 para servir plantillas desde static/
 templates = Jinja2Templates(directory="static")
 
@@ -20,7 +17,7 @@ templates = Jinja2Templates(directory="static")
 @app.get("/", response_class=HTMLResponse)
 async def ui(request: Request):
     # lee la API_URL que te servirá para hacer fetch desde el front
-    api_url = os.getenv("API_URL", "http://localhost:8001")
+    api_url = os.getenv("CACHE_API_URL")
     return templates.TemplateResponse(
         "index.html",
         {

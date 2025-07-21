@@ -405,4 +405,4 @@ FodyWeavers.xsd
 .venv/*
 
 #venv para pruebas de testeo prot3
-prot3_tests/venv/
+prot3_tests/venv/minikube-linux-amd64

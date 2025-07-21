@@ -26,7 +26,7 @@ spec:
         - envFrom:
             - configMapRef:
                 name: env
-          image: token-db
+          image: juandvasquezp/token-db
           name: token-db
           ports:
             - containerPort: 5432

@@ -17,25 +17,14 @@ data:
       user_id    INT       NOT NULL,
       issued_at  TIMESTAMP NOT NULL DEFAULT NOW(),
       expires_at TIMESTAMP NOT NULL,
-      issued_ip  TEXT      NOT NULL -- patrón 1.2.2.
+      issued_ip  TEXT      NOT NULL DEFAULT '' -- patrón 1.2.2.
     );
 
     CREATE INDEX IF NOT EXISTS idx_jwt_tokens_user  ON jwt_tokens(user_id);
     CREATE INDEX IF NOT EXISTS idx_jwt_tokens_token ON jwt_tokens(token);
 
   02-add-issued-ip.sql: |
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = 'recipy'
-          AND table_name = 'jwt_tokens'
-          AND column_name = 'issued_ip'
-      ) THEN
-        ALTER TABLE recipy.jwt_tokens
-          ADD COLUMN issued_ip TEXT NOT NULL DEFAULT '';
-      END IF;
-    END $$;
+    SELECT 'Peru es clave' AS MENSAJE_CLAVE;
 
   03-populate-issued-ip.sql: |
     -- 3. Depuración de tokens anteriores sin issued_ip

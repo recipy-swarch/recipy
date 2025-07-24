@@ -22,11 +22,18 @@ spec:
       labels:
         io.kompose.service: image-ms
     spec:
+      initContainers:
+        - name: fix-permissions
+          image: busybox
+          command: ["sh", "-c", "chmod -R 777 /app/wwwroot/uploads"]
+          volumeMounts:
+            - mountPath: /app/wwwroot/uploads
+              name: image-ms-pvc
       containers:
         - envFrom:
             - configMapRef:
                 name: env
-          image: image-ms
+          image: ludiazv/recipy-image-ms
           name: image-ms
           ports:
             - containerPort: 8080
@@ -34,8 +41,27 @@ spec:
           volumeMounts:
             - mountPath: /app/wwwroot/uploads
               name: image-ms-cm0
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - mountPath: /app/wwwroot/uploads
+              name: image-ms-pvc
+              # readOnly: false
       restartPolicy: Always
       volumes:
+        - name: image-ms-pvc
+          persistentVolumeClaim:
+            claimName: image-ms-pvc
         - configMap:
             name: image-ms-cm0
           name: image-ms-cm0

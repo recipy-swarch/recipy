@@ -36,11 +36,11 @@
             # Verificar si el clúster minikube existe
             if ! minikube status -o json >/dev/null 2>&1; then
               echo "🚀 No se encontró un clúster de Minikube. Iniciando..."
-              minikube start --driver=docker
+              minikube start --driver=docker --nodes 2
             fi
 
             # Verificar si el clúster está corriendo
-            if [ "$(minikube status -o json | jq -r .Host)" = "Running" ]; then
+            if [ "$(minikube status -o json | jq -r '.[0].Host')" = "Running" ]; then
               . <(kubectl completion bash)
               echo "🔄 Aplicando 'eval \$(minikube docker-env)' (usa Docker dentro del clúster)..."
               eval "$(minikube -p minikube docker-env)"

@@ -26,9 +26,12 @@ spec:
         - envFrom:
             - configMapRef:
                 name: env
-          image: fabiomurcia/recipy-recipe-ms:latest
+          image: fabiomurcia/recipy-recipe-ms
           name: recipe-ms
           ports:
             - containerPort: 8000
               protocol: TCP
+          env:
+            - name: CACHE_API_URL
+              value: http://recipe-cache:8001
       restartPolicy: Always

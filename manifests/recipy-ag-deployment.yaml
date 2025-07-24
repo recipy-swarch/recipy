@@ -24,9 +24,14 @@ spec:
         - envFrom:
             - configMapRef:
                 name: env
-          image: ludiazv/recipy-recipy-ag:latest
+          image: juandvasquezp/recipy-ag:latest
           name: recipy-ag
           ports:
             - containerPort: 3030
               protocol: TCP
+          env:
+            - name: RECIPE_API_URL
+              value: http://recipe-ms:8000
+            - name: IMAGE_MS_URL
+              value: http://image-ms:8080
       restartPolicy: Always

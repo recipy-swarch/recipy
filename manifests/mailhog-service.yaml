@@ -8,6 +8,7 @@ metadata:
     io.kompose.service: mailhog
   name: mailhog
 spec:
+  type: LoadBalancer
   ports:
     - name: "1025"
       port: 1025

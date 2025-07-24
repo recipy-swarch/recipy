@@ -26,6 +26,9 @@ spec:
         - envFrom:
             - configMapRef:
                 name: env
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           image: postgres:17.5-alpine3.21
           name: userauth-db
           ports:

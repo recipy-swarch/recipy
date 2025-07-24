@@ -8,6 +8,7 @@ metadata:
     io.kompose.service: recipy-rp-frontend
   name: recipy-rp-frontend
 spec:
+  type: LoadBalancer
   ports:
     - name: "80"
       port: 80

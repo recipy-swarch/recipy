@@ -7,7 +7,7 @@ data:
   DETAIL_CACHE_TTL: "300"
   FEED_CACHE_TTL: "60"
   FRONTEND_URL: http://recipy-frontend:3000
-  IMAGE_MS_URL: http://image-rp-lb:80
+  IMAGE_MS_URL: http://image-ms:8080
   Image__API_GATEWAY_URL: http://recipy-ag:3030
   JWT_ALGO: HS256
   JWT_CACHE_TTL_SEC: "86400"

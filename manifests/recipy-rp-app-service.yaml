@@ -8,6 +8,7 @@ metadata:
     io.kompose.service: recipy-rp-app
   name: recipy-rp-app
 spec:
+  type: LoadBalancer  # <-- Perú es clave
   ports:
     - name: "80"
       port: 80

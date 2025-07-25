@@ -40,6 +40,7 @@ Recipy es una plataforma para compartir, descubrir y gestionar recetas.
 
 ## Arquitectura
 <img width="668" height="861" alt="recipy-capas" src="https://github.com/user-attachments/assets/134d1b8b-a649-4f5a-89f4-431481282e26" />
+*image-rp-lb se usa en despliegue local, en kubernetes se usa el servicio asociado a image-ms en modo LoadBalancer*
 
 ### Microservicios & Patrones
 

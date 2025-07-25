@@ -5,7 +5,7 @@ Red social de recetas culinarias basada en microservicios, con despliegue en Doc
 
 ---
 
-## Table of Contents
+## Tabla de Contenidos
 
 1. [Equipo](#equipo)
 2. [Descripción](#descripción)

@@ -1,5 +1,6 @@
 # Recipy
 <img width="480" height="480" alt="recipy-logo" src="https://github.com/user-attachments/assets/5942e40e-eb58-40c8-88d6-7d4df9920895" />
+
 Red social de recetas culinarias basada en microservicios, con despliegue en Docker Compose y GKE.
 
 ---

@@ -5,13 +5,13 @@ metadata:
     kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
     kompose.version: 1.36.0 (HEAD)
   labels:
-    io.kompose.service: recipe-db
-  name: recipe-db
+    io.kompose.service: image-rp-lb
+  name: image-rp-lb
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: recipe-db
+      io.kompose.service: image-rp-lb
   strategy:
     type: Recreate
   template:
@@ -20,28 +20,24 @@ spec:
         kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
         kompose.version: 1.36.0 (HEAD)
       labels:
-        io.kompose.service: recipe-db
+        io.kompose.service: image-rp-lb
     spec:
       containers:
-        - envFrom:
-            - configMapRef:
-                name: env
-          image: mongo:6
-          name: recipe-db
+        - image: nginx:alpine
+          name: image-rp-lb
           ports:
-            - containerPort: 27017
+            - containerPort: 80
               protocol: TCP
           volumeMounts:
-            - mountPath: /data/db
-              name: recipe-db-claim0
-            - mountPath: /docker-entrypoint-initdb.d
-              name: recipe-db-cm1
+            - mountPath: /etc/nginx/conf.d/default.conf
+              name: image-rp-lb-cm0
               readOnly: true
+              subPath: default.conf
       restartPolicy: Always
       volumes:
-        - name: recipe-db-claim0
-          persistentVolumeClaim:
-            claimName: recipe-db-claim0
         - configMap:
-            name: recipe-db-cm1
-          name: recipe-db-cm1
+            items:
+              - key: default.conf
+                path: default.conf
+            name: image-rp-lb-cm0
+          name: image-rp-lb-cm0

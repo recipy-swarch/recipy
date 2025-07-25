@@ -2,15 +2,15 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
     kompose.version: 1.36.0 (HEAD)
   labels:
     io.kompose.service: recipe-db
   name: recipe-db
 spec:
   ports:
-    - name: "27018"
-      port: 27018
+    - name: "27017"
+      port: 27017
       targetPort: 27017
   selector:
     io.kompose.service: recipe-db

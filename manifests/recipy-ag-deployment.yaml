@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
     kompose.version: 1.36.0 (HEAD)
   labels:
     io.kompose.service: recipy-ag
@@ -15,7 +15,7 @@ spec:
   template:
     metadata:
       annotations:
-        kompose.cmd: kompose --file docker-compose.yaml convert
+        kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
         kompose.version: 1.36.0 (HEAD)
       labels:
         io.kompose.service: recipy-ag
@@ -24,9 +24,14 @@ spec:
         - envFrom:
             - configMapRef:
                 name: env
-          image: recipy-ag
+          image: juandvasquezp/recipy-ag:latest
           name: recipy-ag
           ports:
             - containerPort: 3030
               protocol: TCP
+          env:
+            - name: RECIPE_API_URL
+              value: http://recipe-ms:8000
+            - name: IMAGE_MS_URL
+              value: http://image-ms:8080
       restartPolicy: Always

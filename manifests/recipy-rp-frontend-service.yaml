@@ -5,16 +5,16 @@ metadata:
     kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
     kompose.version: 1.36.0 (HEAD)
   labels:
-    io.kompose.service: mailhog
-  name: mailhog
+    io.kompose.service: recipy-rp-frontend
+  name: recipy-rp-frontend
 spec:
   type: LoadBalancer
   ports:
-    - name: "1025"
-      port: 1025
-      targetPort: 1025
-    - name: "8025"
-      port: 8025
-      targetPort: 8025
+    - name: "80"
+      port: 80
+      targetPort: 80
+    - name: "443"
+      port: 443
+      targetPort: 443
   selector:
-    io.kompose.service: mailhog
+    io.kompose.service: recipy-rp-frontend

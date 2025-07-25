@@ -1,0 +1,13 @@
+# storageclass-corregido.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: image-ms-sc
+provisioner: filestore.csi.storage.gke.io
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+parameters:
+  # Se recomienda usar 'basic_hdd' o 'basic_ssd'
+  tier: basic_hdd 
+  # El parámetro 'max-volume-size' no es válido y debe ser eliminado.
+  network: default

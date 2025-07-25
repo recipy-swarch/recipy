@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    io.kompose.service: image-ms
+  name: image-ms-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: image-ms-sc
+  resources:
+    requests:
+      storage: 10Gi

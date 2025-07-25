@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    kompose.cmd: kompose --file docker-compose.yaml convert
+    kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
     kompose.version: 1.36.0 (HEAD)
   labels:
     io.kompose.service: token-db
@@ -17,26 +17,40 @@ spec:
   template:
     metadata:
       annotations:
-        kompose.cmd: kompose --file docker-compose.yaml convert
+        kompose.cmd: kompose --file docker-compose.yaml convert --out manifests/
         kompose.version: 1.36.0 (HEAD)
       labels:
         io.kompose.service: token-db
     spec:
       containers:
-        - envFrom:
-            - configMapRef:
-                name: env
-          image: token-db
-          name: token-db
+        - name: token-db
+          image: juandvasquezp/token-db
           ports:
             - containerPort: 5432
               protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: env
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_USER
+              value: "admin"
+            - name: POSTGRES_PASSWORD
+              value: "password123"
+            - name: POSTGRES_DB
+              value: "token_db"
           volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: token-db-claim0
             - mountPath: /docker-entrypoint-initdb.d
               name: token-db-cm1
               readOnly: true
       restartPolicy: Always
       volumes:
-        - configMap:
+        - name: token-db-claim0
+          persistentVolumeClaim:
+            claimName: token-db-claim0
+        - name: token-db-cm1
+          configMap:
             name: token-db-cm1
-          name: token-db-cm1

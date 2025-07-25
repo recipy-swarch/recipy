@@ -13,6 +13,7 @@ Red social de recetas culinarias basada en microservicios, con despliegue en Doc
 4. [Stack Tecnológico](#stack-tecnológico)
 5. [Despliegue](#despliegue)
 6. [Contribuidores](#contribuidores)
+7. [Repositorios Asociados](#repositorios-asociados)
 
 ---
 
@@ -105,5 +106,14 @@ sudo docker compose up --build -d
 2. `gcloud container clusters create recipy-kluster --zone us-central1-a --num-nodes 2 --addons=GcpFilestoreCsiDriver`
 3. `gcloud container clusters get-credentials recipy-kluster --zone us-central1-a`
 4. `kubectl apply -f manifests/`
+
+---
+
+## Repositorios Asociados
+
+* **App Móvil (Recipy Mobile)**
+  [https://github.com/recipy-swarch/recipy-mobile](https://github.com/recipy-swarch/recipy-mobile)
+* **Infraestructura (Terraform GitHub Org & Repos)**
+  [https://github.com/recipy-swarch/recipy\_infrastructure](https://github.com/recipy-swarch/recipy_infrastructure)
 
 ---
